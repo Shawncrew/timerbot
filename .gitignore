@@ -1,0 +1,3 @@
+# Add this line to ignore the JSON data file
+timerboard_data.json
+.env
