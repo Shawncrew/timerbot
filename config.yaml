@@ -1,0 +1,13 @@
+# Discord Channel IDs
+channels:
+  timerboard: <timerboard_channel_id>  # Channel where timer list is displayed
+  commands: <commands_channel_id>    # Channel where commands are accepted
+
+# Timer Settings
+timezone: 'UTC'                    # Timezone for all timer operations
+check_interval: 60                 # How often to check timers (seconds)
+notification_time: 60              # When to notify before timer (minutes)
+expiry_time: 60                  # How long to keep expired timers (minutes)
+
+# Bot Settings
+command_prefix: '!'               # Prefix for bot commands 

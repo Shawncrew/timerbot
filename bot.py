@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import aiohttp  # Add this import at the top
 import json
 from pathlib import Path
+import yaml  # Add this import at the top
 
 # Load environment variables
 load_dotenv()
@@ -22,9 +23,29 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-TIMERBOARD_CHANNEL_ID = 1346598996830851072  # Add your channel ID
-TIMERBOARD_CMD_CHANNEL_ID = 1346599034990891121  # Add your channel ID
-EVE_TZ = pytz.timezone('UTC')  # EVE Online uses UTC
+# Replace the hardcoded constants with config loading
+def load_config():
+    try:
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+            print("Loaded configuration from config.yaml")
+            return config
+    except Exception as e:
+        print(f"Error loading config.yaml: {e}")
+        print("Using default configuration")
+        return {
+            'check_interval': 60,    # seconds
+            'notification_time': 60,  # minutes
+            'expiry_time': 60        # minutes
+        }
+
+# Load config at startup
+CONFIG = load_config()
+
+# Replace hardcoded values with config values
+TIMERBOARD_CHANNEL_ID = 1346598996830851072
+TIMERBOARD_CMD_CHANNEL_ID = 1346599034990891121
+EVE_TZ = pytz.timezone('UTC')
 
 @dataclass
 class Timer:
@@ -51,13 +72,15 @@ class Timer:
 
 class TimerBoard:
     SAVE_FILE = "timerboard_data.json"
+    STARTING_TIMER_ID = 1000  # Fixed starting ID
+    MAX_MESSAGE_LENGTH = 1900  # Discord message length limit
     
     def __init__(self):
         self.timers = []
-        self.next_id = 1000
+        self.next_id = self.STARTING_TIMER_ID
         self.last_update = None
         self.staging_system = None
-        self.load_data()  # Load data when initializing
+        self.load_data()
 
     def save_data(self):
         """Save timerboard data to JSON file"""
@@ -93,7 +116,7 @@ class TimerBoard:
                 with open(self.SAVE_FILE, 'r') as f:
                     data = json.load(f)
                 
-                self.next_id = data.get('next_id', 1000)
+                self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
                 self.staging_system = data.get('staging_system')
                 print(f"Loaded staging system: {self.staging_system}")
                 
@@ -121,13 +144,13 @@ class TimerBoard:
             else:
                 print(f"\nNo save file found at {self.SAVE_FILE}")
                 print("Starting with empty timerboard")
-                self.next_id = 1000
+                self.next_id = self.STARTING_TIMER_ID
                 self.staging_system = None
                 self.timers = []
         except Exception as e:
             print(f"\nError loading timerboard data: {e}")
             print("Starting with empty timerboard")
-            self.next_id = 1000
+            self.next_id = self.STARTING_TIMER_ID
             self.staging_system = None
             self.timers = []
 
@@ -135,9 +158,9 @@ class TimerBoard:
         """Update next_id based on highest existing timer ID"""
         if self.timers:
             max_id = max(timer.timer_id for timer in self.timers)
-            self.next_id = max(max_id + 1, 1000)  # Never go below 1000
+            self.next_id = max(max_id + 1, self.STARTING_TIMER_ID)  # Never go below starting ID
         else:
-            self.next_id = 1000
+            self.next_id = self.STARTING_TIMER_ID
 
     def sort_timers(self):
         self.timers.sort(key=lambda x: x.time)
@@ -185,14 +208,14 @@ class TimerBoard:
         return None
 
     def remove_expired(self) -> list[Timer]:
-        """Remove timers that are more than 1 hour old"""
+        """Remove timers that are older than the configured expiry time"""
         now = datetime.datetime.now(EVE_TZ)
-        one_hour_ago = now - datetime.timedelta(hours=1)
+        expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
         
-        expired = [t for t in self.timers if t.time < one_hour_ago]
+        expired = [t for t in self.timers if t.time < expiry_threshold]
         
         if expired:
-            self.timers = [t for t in self.timers if t.time >= one_hour_ago]
+            self.timers = [t for t in self.timers if t.time >= expiry_threshold]
             print(f"Removed {len(expired)} expired timers")
             self.save_data()  # Save after removing expired timers
         
@@ -228,7 +251,7 @@ class TimerBoard:
                     f"({timer.timer_id})\n"
                 )
                 
-                if len(current_message) + len(timer_line) > 1900:
+                if len(current_message) + len(timer_line) > self.MAX_MESSAGE_LENGTH:
                     messages_to_update.append(current_message.strip())
                     current_message = timer_line
                 else:
@@ -270,12 +293,12 @@ async def check_timers():
                 time_until = timer.time - now
                 minutes_until = time_until.total_seconds() / 60
                 
-                # If timer is between 60-61 minutes away, send notification
-                if 60 <= minutes_until < 61:
-                    cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
+                # Use config value for notification time
+                if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
+                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
                     if cmd_channel:
                         system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{timer.system.replace('-', '_')})"
-                        notification = f"⚠️ Timer in 60 minutes: {system_link} - {timer.structure_name} {timer.location} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
+                        notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.location} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
                         await cmd_channel.send(notification)
                         print(f"Sent notification for timer {timer.timer_id}")
             
@@ -288,11 +311,11 @@ async def check_timers():
                 channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
                 await timerboard.update_timerboard(channel)
             
-            await asyncio.sleep(60)  # Check every minute
+            await asyncio.sleep(CONFIG['check_interval'])
             
         except Exception as e:
             print(f"Error in timer check loop: {e}")
-            await asyncio.sleep(60)  # Still wait before retrying
+            await asyncio.sleep(CONFIG['check_interval'])
 
 @bot.event
 async def on_ready():
