@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 import logging
 from logging.handlers import RotatingFileHandler
+import sys
 
 # Update paths to be absolute
 SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
@@ -57,10 +58,48 @@ def setup_logging():
 
 # Initialize logger
 logger = setup_logging()
+logger.info("""
+=====================================
+    EVE Online Timer Discord Bot
+=====================================
+""")
 
 # Then the rest of the bot code
-load_dotenv('/opt/timerbot/bot/.env')
-TOKEN = os.getenv('DISCORD_TOKEN')
+
+# Load environment variables and token with better error handling
+def load_token():
+    """Load Discord token from .env file"""
+    try:
+        # First try /opt/timerbot/bot/.env
+        if os.path.exists('/opt/timerbot/bot/.env'):
+            load_dotenv('/opt/timerbot/bot/.env')
+            logger.info("Loading token from /opt/timerbot/bot/.env")
+        else:
+            # Try local .env file
+            if os.path.exists('.env'):
+                load_dotenv()
+                logger.info("Loading token from local .env file")
+            else:
+                logger.error("No .env file found in either location")
+                raise FileNotFoundError("No .env file found")
+
+        token = os.getenv('DISCORD_TOKEN')
+        if not token:
+            logger.error("DISCORD_TOKEN not found in .env file")
+            raise ValueError("DISCORD_TOKEN not found in .env file")
+            
+        return token
+
+    except Exception as e:
+        logger.error(f"Error loading Discord token: {e}")
+        raise
+
+# Replace the token loading code
+try:
+    TOKEN = load_token()
+except Exception as e:
+    logger.error("Failed to start bot: No valid Discord token")
+    sys.exit(1)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -68,18 +107,38 @@ bot = commands.Bot(command_prefix='!', intents=intents, help_command=commands.De
 
 # Replace the hardcoded constants with config loading
 def load_config():
+    """Load configuration from config.yaml, checking both /opt/timerbot/bot/ and local directory"""
     try:
-        with open(CONFIG_FILE, 'r') as f:
-            config = yaml.safe_load(f)
-            logger.info("Loaded configuration from config.yaml")
-            return config
-    except Exception as e:
-        logger.error(f"Error loading config.yaml: {e}")
+        # First try the /opt/timerbot/bot/ location
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = yaml.safe_load(f)
+                logger.info(f"Loaded configuration from {CONFIG_FILE}")
+                return config
+                
+        # If not found, try local directory
+        local_config = "config.yaml"
+        if os.path.exists(local_config):
+            with open(local_config, 'r') as f:
+                config = yaml.safe_load(f)
+                logger.info(f"Loaded configuration from {local_config}")
+                return config
+                
+        # If neither exists, use defaults
+        logger.error("No config.yaml found in either /opt/timerbot/bot/ or local directory")
         logger.info("Using default configuration")
         return {
             'check_interval': 60,    # seconds
             'notification_time': 60,  # minutes
             'expiry_time': 60        # minutes
+        }
+    except Exception as e:
+        logger.error(f"Error loading config.yaml: {e}")
+        logger.info("Using default configuration")
+        return {
+            'check_interval': 60,
+            'notification_time': 60,
+            'expiry_time': 60
         }
 
 # Load config at startup
@@ -157,47 +216,57 @@ class TimerBoard:
         try:
             with open(self.SAVE_FILE, 'w') as f:
                 json.dump(data, f, indent=2)
-            print(f"Saved timerboard data to {self.SAVE_FILE}")
+            logger.info(f"Saved timerboard data to {self.SAVE_FILE}")
         except Exception as e:
-            print(f"Error saving timerboard data: {e}")
+            logger.error(f"Error saving timerboard data: {e}")
 
     def load_data(self):
         """Load timerboard data from JSON file"""
         try:
+            # First try the /opt/timerbot/data/ location
             if Path(self.SAVE_FILE).exists():
                 logger.info(f"Loading timerboard data from {self.SAVE_FILE}")
                 with open(self.SAVE_FILE, 'r') as f:
                     data = json.load(f)
-                
-                self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
-                logger.info(f"Next timer ID set to: {self.next_id}")
-                
-                self.timers = []
-                for timer_data in data.get('timers', []):
-                    try:
-                        time = datetime.datetime.fromisoformat(timer_data['time'])
-                        timer = Timer(
-                            time=time,
-                            description=timer_data['description'],
-                            timer_id=timer_data['timer_id'],
-                            system=timer_data['system'],
-                            structure_name=timer_data['structure_name'],
-                            notes=timer_data.get('notes', ''),
-                            message_id=timer_data.get('message_id'),
-                            gate_distance=timer_data.get('gate_distance')
-                        )
-                        self.timers.append(timer)
-                        logger.info(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer.timer_id})")
-                    except Exception as e:
-                        logger.error(f"Error loading timer: {e}")
-                        logger.error(f"Timer data: {timer_data}")
-                
-                logger.info(f"Successfully loaded {len(self.timers)} timers")
             else:
-                logger.info(f"No save file found at {self.SAVE_FILE}")
-                logger.info("Starting with empty timerboard")
-                self.next_id = self.STARTING_TIMER_ID
-                self.timers = []
+                # Try local directory
+                local_file = "timerboard_data.json"
+                if Path(local_file).exists():
+                    logger.info(f"Loading timerboard data from {local_file}")
+                    with open(local_file, 'r') as f:
+                        data = json.load(f)
+                else:
+                    logger.info("No save file found in either location")
+                    logger.info("Starting with empty timerboard")
+                    self.next_id = self.STARTING_TIMER_ID
+                    self.timers = []
+                    return
+
+            # Process the loaded data
+            self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
+            logger.info(f"Next timer ID set to: {self.next_id}")
+            
+            self.timers = []
+            for timer_data in data.get('timers', []):
+                try:
+                    time = datetime.datetime.fromisoformat(timer_data['time'])
+                    timer = Timer(
+                        time=time,
+                        description=timer_data['description'],
+                        timer_id=timer_data['timer_id'],
+                        system=timer_data['system'],
+                        structure_name=timer_data['structure_name'],
+                        notes=timer_data.get('notes', ''),
+                        message_id=timer_data.get('message_id'),
+                        gate_distance=timer_data.get('gate_distance')
+                    )
+                    self.timers.append(timer)
+                    logger.info(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer.timer_id})")
+                except Exception as e:
+                    logger.error(f"Error loading timer: {e}")
+                    logger.error(f"Timer data: {timer_data}")
+            
+            logger.info(f"Successfully loaded {len(self.timers)} timers")
         except Exception as e:
             logger.error(f"Error loading timerboard data: {e}")
             logger.info("Starting with empty timerboard")
@@ -275,7 +344,7 @@ class TimerBoard:
         
         if expired:
             self.timers = [t for t in self.timers if t.time >= expiry_threshold]
-            print(f"Removed {len(expired)} expired timers")
+            logger.info(f"Removed {len(expired)} expired timers")
             self.save_data()  # Save after removing expired timers
         
         return expired
@@ -371,16 +440,12 @@ async def check_timers():
 
 @bot.event
 async def on_ready():
-    logger.info("""
-=====================================
-         Bot Connected
-=====================================
-""")
+    logger.info(f"Bot connected as {bot.user}")
     
     # Debug channel information
-    logger.info("\nChannel Information:")
-    logger.info(f"Looking for Timerboard channel: {TIMERBOARD_CHANNEL_ID}")
-    logger.info(f"Looking for Commands channel: {TIMERBOARD_CMD_CHANNEL_ID}")
+    logger.info("Checking channels:")
+    logger.info(f"Timerboard channel: {TIMERBOARD_CHANNEL_ID}")
+    logger.info(f"Commands channel: {TIMERBOARD_CMD_CHANNEL_ID}")
     
     timerboard_channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
     cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
@@ -398,8 +463,7 @@ async def on_ready():
     else:
         logger.error("Could not find Commands channel!")
     
-    # Continue with normal startup
-    logger.info("\nStarting timer check loop...")
+    # Start timer check loop
     bot.loop.create_task(check_timers())
     
     # Update the timerboard display
@@ -455,12 +519,12 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
             new_timer, similar_timers = await timerboard.add_timer(time, description)
             
             if similar_timers:
-                print(f"{ctx.author} added timer {new_timer.timer_id} with similar timers warning")
+                logger.info(f"{ctx.author} added timer {new_timer.timer_id} with similar timers warning")
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
                 await ctx.send(f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
                              f"Added anyway with ID {new_timer.timer_id}")
             else:
-                print(f"{ctx.author} added timer {new_timer.timer_id}")
+                logger.info(f"{ctx.author} added timer {new_timer.timer_id}")
                 await ctx.send(f"Timer added with ID {new_timer.timer_id}")
             
             # Update timerboard channel
@@ -476,14 +540,14 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
         """Remove a timer by its ID"""
         timer = timerboard.remove_timer(timer_id)
         if timer:
-            print(f"{ctx.author} removed timer {timer_id}")
+            logger.info(f"{ctx.author} removed timer {timer_id}")
             clean_system = clean_system_name(timer.system)
             system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
             await ctx.send(f"Removed timer: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})")
             timerboard_channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
             await timerboard.update_timerboard(timerboard_channel)
         else:
-            print(f"{ctx.author} attempted to remove non-existent timer {timer_id}")
+            logger.warning(f"{ctx.author} attempted to remove non-existent timer {timer_id}")
             await ctx.send(f"No timer found with ID {timer_id}")
 
     @commands.command()
