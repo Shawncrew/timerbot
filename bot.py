@@ -335,7 +335,7 @@ timerboard = TimerBoard()
 
 async def check_timers():
     await bot.wait_until_ready()
-    print("Starting timer check loop...")
+    logger.info("Starting timer check loop...")
     while not bot.is_closed():
         try:
             now = datetime.datetime.now(EVE_TZ)
@@ -345,7 +345,6 @@ async def check_timers():
                 time_until = timer.time - now
                 minutes_until = time_until.total_seconds() / 60
                 
-                # Use config value for notification time
                 if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
                     cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
                     if cmd_channel:
@@ -353,21 +352,21 @@ async def check_timers():
                         system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                         notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
                         await cmd_channel.send(notification)
-                        print(f"Sent notification for timer {timer.timer_id}")
+                        logger.info(f"Sent notification for timer {timer.timer_id}")
             
             # Check for expired timers
             expired = timerboard.remove_expired()
             if expired:
-                print(f"Removed {len(expired)} expired timers:")
+                logger.info(f"Removed {len(expired)} expired timers:")
                 for timer in expired:
-                    print(f"- {timer.to_string()}")
+                    logger.info(f"- {timer.to_string()}")
                 channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
                 await timerboard.update_timerboard(channel)
             
             await asyncio.sleep(CONFIG['check_interval'])
             
         except Exception as e:
-            print(f"Error in timer check loop: {e}")
+            logger.error(f"Error in timer check loop: {e}")
             await asyncio.sleep(CONFIG['check_interval'])
 
 @bot.event
@@ -531,10 +530,3 @@ async def on_command_error(ctx, error):
     else:
         logger.error(f"Error executing '{ctx.command}' by {ctx.author}: {error}")
         await ctx.send(f"Error executing command: {error}")
-
-# At the start of the script, right after logger setup:
-logger.info("""
-=====================================
-    EVE Timer Discord Bot Start
-=====================================
-""")
