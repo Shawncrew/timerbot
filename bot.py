@@ -288,8 +288,7 @@ class TimerBoard:
         existing_messages.reverse()
 
         messages_to_update = []
-        # Always start with staging system if set
-        current_message = f"Staging System: {self.staging_system}\n" if self.staging_system else ""
+        current_message = ""
 
         if self.timers:
             for timer in self.timers:
@@ -324,7 +323,7 @@ class TimerBoard:
             for message in existing_messages[len(messages_to_update):]:
                 await message.delete()
         else:
-            content = f"Staging System: {self.staging_system}\nNo active timers." if self.staging_system else "No active timers."
+            content = "No active timers."
             if existing_messages:
                 await existing_messages[0].edit(content=content)
                 for message in existing_messages[1:]:
