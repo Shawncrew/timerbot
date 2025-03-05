@@ -1,3 +1,27 @@
-# Add this line to ignore the JSON data file
-timerboard_data.json
+# Environment and configuration
 .env
+config.yaml
+timerboard_data.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System
+.DS_Store
+Thumbs.db

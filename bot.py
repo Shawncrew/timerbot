@@ -124,50 +124,6 @@ def clean_system_name(system: str) -> str:
     system = '-'.join(filter(None, system.split()))
     return system
 
-async def get_dotlan_distance(from_system: str, to_system: str) -> Optional[int]:
-    """Get number of jumps between systems from Dotlan"""
-    try:
-        # Format system names for URL - use hyphens
-        from_sys = from_system.replace(' ', '-')
-        to_sys = to_system.replace(' ', '-')
-        url = f"https://evemaps.dotlan.net/route/{from_sys}:{to_sys}"
-        
-        logger.info(f"Fetching distance from Dotlan: {from_system} to {to_system}")
-        logger.info(f"URL: {url}")
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status != 200:
-                    logger.error(f"Dotlan request failed with status {response.status}")
-                    return None
-                    
-                html = await response.text()
-                soup = BeautifulSoup(html, 'html.parser')
-                
-                # Find the route table specifically
-                route_table = soup.find('table', class_='tablelist')
-                if route_table:
-                    # Count only the system rows (those with system links)
-                    system_rows = route_table.find_all('a', class_='sys')
-                    if system_rows:
-                        # Number of jumps is number of systems minus 1
-                        jumps = len(system_rows) - 1
-                        logger.info(f"Found route with {len(system_rows)} systems ({jumps} jumps)")
-                        return jumps
-                    else:
-                        logger.error("Could not find system links in route table")
-                else:
-                    logger.error("Could not find route table in Dotlan response")
-                    
-    except Exception as e:
-        logger.error(f"Error getting distance from Dotlan: {e}")
-    
-    return None
-
 class TimerBoard:
     SAVE_FILE = SAVE_FILE
     STARTING_TIMER_ID = 1000  # Fixed starting ID
@@ -177,15 +133,12 @@ class TimerBoard:
         self.timers = []
         self.next_id = self.STARTING_TIMER_ID
         self.last_update = None
-        self.staging_system = None
-        self.distances = {}  # Cache for system distances
         self.load_data()
 
     def save_data(self):
         """Save timerboard data to JSON file"""
         data = {
             'next_id': self.next_id,
-            'staging_system': self.staging_system,
             'timers': [
                 {
                     'time': timer.time.isoformat(),
@@ -217,7 +170,6 @@ class TimerBoard:
                     data = json.load(f)
                 
                 self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
-                self.staging_system = data.get('staging_system')
                 
                 self.timers = []
                 for timer_data in data.get('timers', []):
@@ -245,13 +197,11 @@ class TimerBoard:
                 print(f"\nNo save file found at {self.SAVE_FILE}")
                 print("Starting with empty timerboard")
                 self.next_id = self.STARTING_TIMER_ID
-                self.staging_system = None
                 self.timers = []
         except Exception as e:
             print(f"\nError loading timerboard data: {e}")
             print("Starting with empty timerboard")
             self.next_id = self.STARTING_TIMER_ID
-            self.staging_system = None
             self.timers = []
 
     def update_next_id(self):
@@ -298,13 +248,6 @@ class TimerBoard:
             gate_distance=None
         )
         
-        # Calculate distance if staging system is set
-        if self.staging_system:
-            jumps = await get_dotlan_distance(self.staging_system, system)
-            if jumps is not None:
-                new_timer.gate_distance = jumps
-                logger.info(f"Calculated distance for new timer: {jumps} jumps")
-        
         # Check for duplicates
         similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
         if not similar_timers:
@@ -337,47 +280,6 @@ class TimerBoard:
         
         return expired
 
-    async def update_distances(self):
-        """Update distances for timers that need it"""
-        if not self.staging_system:
-            logger.info("No staging system set, clearing all distances")
-            for timer in self.timers:
-                timer.gate_distance = None
-            return
-
-        logger.info(f"Updating distances from staging system: {self.staging_system}")
-        logger.info(f"Found {len(self.timers)} timers to check")
-
-        # Update distances for timers without them
-        for timer in self.timers:
-            if timer.gate_distance is None:
-                logger.info(f"Calculating distance for timer {timer.timer_id} ({timer.system})")
-                jumps = await get_dotlan_distance(self.staging_system, timer.system)
-                if jumps is not None:
-                    timer.gate_distance = jumps
-                    logger.info(f"Updated distance for timer {timer.timer_id}: {jumps} jumps")
-                else:
-                    logger.warning(f"Failed to get distance for timer {timer.timer_id}")
-
-        logger.info("Finished updating distances")
-        self.save_data()
-
-    async def set_staging(self, system: str, channel: discord.TextChannel) -> bool:
-        """Set the staging system and update all distances"""
-        self.staging_system = system
-        
-        # Force recalculation of all distances
-        for timer in self.timers:
-            timer.gate_distance = None  # Clear existing distances
-        
-        # Calculate new distances
-        await self.update_distances()
-        
-        # Save and update display
-        self.save_data()
-        await self.update_timerboard(channel)
-        return True
-
     async def update_timerboard(self, channel: discord.TextChannel):
         existing_messages = []
         async for message in channel.history(limit=100):
@@ -395,14 +297,9 @@ class TimerBoard:
                 clean_system = clean_system_name(timer.system)
                 system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                 
-                # Add distance info if available
-                distance_info = ""
-                if timer.gate_distance is not None:
-                    distance_info = f" [{timer.gate_distance}j]"
-                
                 timer_line = (
                     f"`{time_str}` "
-                    f"{system_link}{distance_info} - "
+                    f"{system_link} - "
                     f"{timer.structure_name} {timer.notes} "
                     f"({timer.timer_id})\n"
                 )
@@ -611,25 +508,6 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
         except Exception as e:
             logger.error(f"Error refreshing timerboard: {e}")
             await ctx.send(f"Error refreshing timerboard: {e}")
-
-    @commands.command()
-    @commands.check(cmd_channel_check)
-    async def staging(self, ctx, system: str):
-        """Set the staging system for the timerboard"""
-        try:
-            logger.info(f"{ctx.author} setting staging system to: {system}")
-            success = await timerboard.set_staging(system, bot.get_channel(TIMERBOARD_CHANNEL_ID))
-            
-            if success:
-                logger.info(f"Staging system set to: {system}")
-                await ctx.send(f"Staging system set to {system}")
-            else:
-                logger.warning(f"Failed to set staging system to: {system}")
-                await ctx.send(f"Failed to set staging system. Please check that {system} is a valid EVE system name.")
-                
-        except Exception as e:
-            logger.error(f"Error setting staging system: {e}")
-            await ctx.send(f"Error setting staging system: {e}")
 
 # Move the commands into the Cog
 async def setup():

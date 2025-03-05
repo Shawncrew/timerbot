@@ -25,7 +25,7 @@ sudo systemctl enable timerbot
 sudo systemctl start timerbot
 
 # Set up log rotation
-sudo tee /etc/logrotate.d/timerbot << EOF
+sudo tee /etc/logrotate.d/timerbot << 'EOF'
 /opt/timerbot/logs/bot.log {
     daily
     rotate 7
