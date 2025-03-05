@@ -1,7 +1,10 @@
 # Discord Channel IDs
 channels:
-  timerboard: <timerboard_channel_id>  # Channel where timer list is displayed
-  commands: <commands_channel_id>    # Channel where commands are accepted
+ # timerboard: 1346598996830851072  # Channel where timer list is displayed #Test Bot
+ # commands: 1346599034990891121    # Channel where commands are accepted # Test Bot
+
+ timerboard: 1346620736055410750  # Channel where timer list is displayed
+ commands: 1346620859988574351    # Channel where commands are accepted 
 
 # Timer Settings
 timezone: 'UTC'                    # Timezone for all timer operations

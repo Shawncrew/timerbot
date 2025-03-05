@@ -1,3 +1,4 @@
+# First all imports
 import discord
 from discord.ext import commands
 import datetime
@@ -7,32 +8,74 @@ import asyncio
 from dataclasses import dataclass
 import pytz
 from dotenv import load_dotenv
-import os  # Also needed for os.getenv
+import os
 import requests
 from bs4 import BeautifulSoup
-import aiohttp  # Add this import at the top
+import aiohttp
 import json
 from pathlib import Path
-import yaml  # Add this import at the top
+import yaml
+import logging
+from logging.handlers import RotatingFileHandler
 
-# Load environment variables
-load_dotenv()
+# Update paths to be absolute
+SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
+CONFIG_FILE = "/opt/timerbot/bot/config.yaml"
+LOG_DIR = "/opt/timerbot/logs"
+
+# Then logger setup
+def setup_logging():
+    # Update log directory
+    log_dir = LOG_DIR
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Configure logging
+    logger = logging.getLogger('timerbot')
+    logger.setLevel(logging.INFO)
+    
+    # Add rotating file handler (10 files, 10MB each)
+    handler = RotatingFileHandler(
+        f"{log_dir}/bot.log",
+        maxBytes=10_000_000,
+        backupCount=10
+    )
+    
+    # Format for log messages
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    
+    # Also log to console
+    console = logging.StreamHandler()
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+    
+    return logger
+
+# Initialize logger
+logger = setup_logging()
+
+# Then the rest of the bot code
+load_dotenv('/opt/timerbot/bot/.env')
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=commands.DefaultHelpCommand(command_attrs={'name': 'info'}))
 
 # Replace the hardcoded constants with config loading
 def load_config():
     try:
-        with open('config.yaml', 'r') as f:
+        with open(CONFIG_FILE, 'r') as f:
             config = yaml.safe_load(f)
-            print("Loaded configuration from config.yaml")
+            logger.info("Loaded configuration from config.yaml")
             return config
     except Exception as e:
-        print(f"Error loading config.yaml: {e}")
-        print("Using default configuration")
+        logger.error(f"Error loading config.yaml: {e}")
+        logger.info("Using default configuration")
         return {
             'check_interval': 60,    # seconds
             'notification_time': 60,  # minutes
@@ -43,25 +86,28 @@ def load_config():
 CONFIG = load_config()
 
 # Replace hardcoded values with config values
-TIMERBOARD_CHANNEL_ID = 1346598996830851072
-TIMERBOARD_CMD_CHANNEL_ID = 1346599034990891121
 EVE_TZ = pytz.timezone('UTC')
+
+# Instead, use the config values
+TIMERBOARD_CHANNEL_ID = CONFIG['channels']['timerboard']
+TIMERBOARD_CMD_CHANNEL_ID = CONFIG['channels']['commands']
 
 @dataclass
 class Timer:
     time: datetime.datetime
     description: str
     timer_id: int
-    system: str = ""  # Added field for system name
-    structure_name: str = ""  # Added field for structure name
-    location: str = ""  # For location tags
+    system: str = ""
+    structure_name: str = ""
+    notes: str = ""
     message_id: Optional[int] = None
+    gate_distance: Optional[int] = None
 
     def to_string(self) -> str:
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         # Format: ```time```  **system** - structure_name  notes (id)
-        location_str = f" {self.location.strip('[]')}" if self.location else ""
-        return f"```{time_str}```  **{self.system}** - {self.structure_name}  {location_str} ({self.timer_id})"
+        notes_str = f" {self.notes.strip('[]')}" if self.notes else ""
+        return f"```{time_str}```  **{self.system}** - {self.structure_name}  {notes_str} ({self.timer_id})"
 
     def is_similar(self, other: 'Timer') -> bool:
         # Check if timers are within 5 minutes of each other and have same system and structure
@@ -70,8 +116,60 @@ class Timer:
                 self.system.lower() == other.system.lower() and
                 self.structure_name.lower() == other.structure_name.lower())
 
+def clean_system_name(system: str) -> str:
+    """Clean system name for URLs and display"""
+    # Remove or replace special characters
+    system = system.replace('»', '-').replace('«', '-')
+    # Remove extra spaces and dashes
+    system = '-'.join(filter(None, system.split()))
+    return system
+
+async def get_dotlan_distance(from_system: str, to_system: str) -> Optional[int]:
+    """Get number of jumps between systems from Dotlan"""
+    try:
+        # Format system names for URL - use hyphens
+        from_sys = from_system.replace(' ', '-')
+        to_sys = to_system.replace(' ', '-')
+        url = f"https://evemaps.dotlan.net/route/{from_sys}:{to_sys}"
+        
+        logger.info(f"Fetching distance from Dotlan: {from_system} to {to_system}")
+        logger.info(f"URL: {url}")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    logger.error(f"Dotlan request failed with status {response.status}")
+                    return None
+                    
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                # Find the route table specifically
+                route_table = soup.find('table', class_='tablelist')
+                if route_table:
+                    # Count only the system rows (those with system links)
+                    system_rows = route_table.find_all('a', class_='sys')
+                    if system_rows:
+                        # Number of jumps is number of systems minus 1
+                        jumps = len(system_rows) - 1
+                        logger.info(f"Found route with {len(system_rows)} systems ({jumps} jumps)")
+                        return jumps
+                    else:
+                        logger.error("Could not find system links in route table")
+                else:
+                    logger.error("Could not find route table in Dotlan response")
+                    
+    except Exception as e:
+        logger.error(f"Error getting distance from Dotlan: {e}")
+    
+    return None
+
 class TimerBoard:
-    SAVE_FILE = "timerboard_data.json"
+    SAVE_FILE = SAVE_FILE
     STARTING_TIMER_ID = 1000  # Fixed starting ID
     MAX_MESSAGE_LENGTH = 1900  # Discord message length limit
     
@@ -80,6 +178,7 @@ class TimerBoard:
         self.next_id = self.STARTING_TIMER_ID
         self.last_update = None
         self.staging_system = None
+        self.distances = {}  # Cache for system distances
         self.load_data()
 
     def save_data(self):
@@ -94,8 +193,9 @@ class TimerBoard:
                     'timer_id': timer.timer_id,
                     'system': timer.system,
                     'structure_name': timer.structure_name,
-                    'location': timer.location,
-                    'message_id': timer.message_id
+                    'notes': timer.notes,
+                    'message_id': timer.message_id,
+                    'gate_distance': timer.gate_distance
                 }
                 for timer in self.timers
             ]
@@ -118,7 +218,6 @@ class TimerBoard:
                 
                 self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
                 self.staging_system = data.get('staging_system')
-                print(f"Loaded staging system: {self.staging_system}")
                 
                 self.timers = []
                 for timer_data in data.get('timers', []):
@@ -130,8 +229,9 @@ class TimerBoard:
                             timer_id=timer_data['timer_id'],
                             system=timer_data['system'],
                             structure_name=timer_data['structure_name'],
-                            location=timer_data['location'],
-                            message_id=timer_data.get('message_id')
+                            notes=timer_data.get('location', ''),
+                            message_id=timer_data.get('message_id'),
+                            gate_distance=timer_data.get('gate_distance')
                         )
                         self.timers.append(timer)
                         print(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} ({timer.timer_id})")
@@ -167,18 +267,26 @@ class TimerBoard:
 
     async def add_timer(self, time: datetime.datetime, description: str) -> tuple[Timer, list[Timer]]:
         # Parse system and structure name from description
-        system_match = re.match(r'([^\s-]+(?:-[^\s-]+)?)\s*-\s*(.+?)(?:\n|$)', description)
+        # First try to match the full system - structure format with possible Ansiblex name
+        system_match = re.match(r'([A-Z0-9-]+)(\s*[»«].*?)(?=\s+\d+,\d+\s+km|\n|$)', description)
         if system_match:
             system = system_match.group(1).strip()
-            structure_name = system_match.group(2).strip()
-            print(f"Adding timer with system: {system}")  # Debug print
+            structure_name = (system + system_match.group(2)).strip()  # Keep full name including the system
+            logger.info(f"Adding timer in system: {system} (structure: {structure_name})")
         else:
-            system = ""
-            structure_name = description
+            # Fallback to regular system - structure format
+            system_match = re.match(r'([^\s-]+(?:-[^\s]+)?)\s*-\s*(.+?)(?:\n|$)', description)
+            if system_match:
+                system = system_match.group(1).strip()
+                structure_name = system_match.group(2).strip()
+                logger.info(f"Adding timer with system: {system}")
+            else:
+                system = ""
+                structure_name = description
 
-        # Extract location tags if present
-        location_match = re.search(r'\[(.*?)\](?:\[(.*?)\])*$', description)
-        location = location_match.group(0) if location_match else ""
+        # Extract notes tags if present
+        notes_match = re.search(r'\[(.*?)\](?:\[(.*?)\])*$', description)
+        notes = notes_match.group(0) if notes_match else ""
 
         new_timer = Timer(
             time=time,
@@ -186,8 +294,16 @@ class TimerBoard:
             timer_id=self.next_id,
             system=system,
             structure_name=structure_name,
-            location=location
+            notes=notes,
+            gate_distance=None
         )
+        
+        # Calculate distance if staging system is set
+        if self.staging_system:
+            jumps = await get_dotlan_distance(self.staging_system, system)
+            if jumps is not None:
+                new_timer.gate_distance = jumps
+                logger.info(f"Calculated distance for new timer: {jumps} jumps")
         
         # Check for duplicates
         similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
@@ -221,10 +337,44 @@ class TimerBoard:
         
         return expired
 
+    async def update_distances(self):
+        """Update distances for timers that need it"""
+        if not self.staging_system:
+            logger.info("No staging system set, clearing all distances")
+            for timer in self.timers:
+                timer.gate_distance = None
+            return
+
+        logger.info(f"Updating distances from staging system: {self.staging_system}")
+        logger.info(f"Found {len(self.timers)} timers to check")
+
+        # Update distances for timers without them
+        for timer in self.timers:
+            if timer.gate_distance is None:
+                logger.info(f"Calculating distance for timer {timer.timer_id} ({timer.system})")
+                jumps = await get_dotlan_distance(self.staging_system, timer.system)
+                if jumps is not None:
+                    timer.gate_distance = jumps
+                    logger.info(f"Updated distance for timer {timer.timer_id}: {jumps} jumps")
+                else:
+                    logger.warning(f"Failed to get distance for timer {timer.timer_id}")
+
+        logger.info("Finished updating distances")
+        self.save_data()
+
     async def set_staging(self, system: str, channel: discord.TextChannel) -> bool:
-        """Set the staging system and update the timerboard header"""
+        """Set the staging system and update all distances"""
         self.staging_system = system
-        self.save_data()  # Save after setting staging system
+        
+        # Force recalculation of all distances
+        for timer in self.timers:
+            timer.gate_distance = None  # Clear existing distances
+        
+        # Calculate new distances
+        await self.update_distances()
+        
+        # Save and update display
+        self.save_data()
         await self.update_timerboard(channel)
         return True
 
@@ -242,12 +392,18 @@ class TimerBoard:
         if self.timers:
             for timer in self.timers:
                 time_str = timer.time.strftime('%Y-%m-%d %H:%M:%S')
-                system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{timer.system.replace('-', '_')})"
+                clean_system = clean_system_name(timer.system)
+                system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+                
+                # Add distance info if available
+                distance_info = ""
+                if timer.gate_distance is not None:
+                    distance_info = f" [{timer.gate_distance}j]"
                 
                 timer_line = (
                     f"`{time_str}` "
-                    f"{system_link} - "
-                    f"{timer.structure_name} {timer.location} "
+                    f"{system_link}{distance_info} - "
+                    f"{timer.structure_name} {timer.notes} "
                     f"({timer.timer_id})\n"
                 )
                 
@@ -295,10 +451,11 @@ async def check_timers():
                 
                 # Use config value for notification time
                 if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
-                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
+                    cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
                     if cmd_channel:
-                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{timer.system.replace('-', '_')})"
-                        notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.location} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
+                        clean_system = clean_system_name(timer.system)
+                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+                        notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
                         await cmd_channel.send(notification)
                         print(f"Sent notification for timer {timer.timer_id}")
             
@@ -321,17 +478,39 @@ async def check_timers():
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     
-    # The TimerBoard class will automatically load data from JSON in __init__
-    # Just need to start the timer checking loop
-    print("Starting timer check loop...")
+    # Debug channel information
+    print("\nChannel Information:")
+    print(f"Looking for Timerboard channel: {TIMERBOARD_CHANNEL_ID}")
+    print(f"Looking for Commands channel: {TIMERBOARD_CMD_CHANNEL_ID}")
+    
+    timerboard_channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
+    cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
+    
+    if timerboard_channel:
+        print(f"Found Timerboard channel: #{timerboard_channel.name}")
+        print(f"Can send messages: {timerboard_channel.permissions_for(timerboard_channel.guild.me).send_messages}")
+    else:
+        print("Could not find Timerboard channel!")
+        
+    if cmd_channel:
+        print(f"Found Commands channel: #{cmd_channel.name}")
+        print(f"Can send messages: {cmd_channel.permissions_for(cmd_channel.guild.me).send_messages}")
+        print(f"Can read messages: {cmd_channel.permissions_for(cmd_channel.guild.me).read_messages}")
+    else:
+        print("Could not find Commands channel!")
+    
+    # Continue with normal startup
+    print("\nStarting timer check loop...")
     bot.loop.create_task(check_timers())
     
     # Update the timerboard display
-    channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
-    if channel:
-        await timerboard.update_timerboard(channel)
-    else:
-        print(f"Could not find channel with ID {TIMERBOARD_CHANNEL_ID}")
+    if timerboard_channel:
+        await timerboard.update_timerboard(timerboard_channel)
+
+# Update the cmd_channel_check function
+async def cmd_channel_check(ctx):
+    logger.info(f"Command '{ctx.command}' received from {ctx.author} in #{ctx.channel.name}")
+    return ctx.channel.id == TIMERBOARD_CMD_CHANNEL_ID
 
 # Add a commands group with category
 class TimerCommands(commands.Cog, name="Basic Commands"):
@@ -339,7 +518,7 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
         self.bot = bot
 
     @commands.command()
-    @commands.check(lambda ctx: ctx.channel.id == TIMERBOARD_CMD_CHANNEL_ID)
+    @commands.check(cmd_channel_check)
     async def add(self, ctx, *, input_text: str):
         """Add a new timer
         Format: !add YYYY-MM-DD HH:MM:SS system - structure [tags]
@@ -377,10 +556,12 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
             new_timer, similar_timers = await timerboard.add_timer(time, description)
             
             if similar_timers:
+                print(f"{ctx.author} added timer {new_timer.timer_id} with similar timers warning")
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
                 await ctx.send(f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
                              f"Added anyway with ID {new_timer.timer_id}")
             else:
+                print(f"{ctx.author} added timer {new_timer.timer_id}")
                 await ctx.send(f"Timer added with ID {new_timer.timer_id}")
             
             # Update timerboard channel
@@ -391,16 +572,64 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
             await ctx.send("Invalid time format. Use: YYYY-MM-DD HH:MM:SS or system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]")
 
     @commands.command()
-    @commands.check(lambda ctx: ctx.channel.id == TIMERBOARD_CMD_CHANNEL_ID)
+    @commands.check(cmd_channel_check)
     async def rm(self, ctx, timer_id: int):
         """Remove a timer by its ID"""
         timer = timerboard.remove_timer(timer_id)
         if timer:
-            await ctx.send(f"Removed timer: {timer.to_string()}")
+            print(f"{ctx.author} removed timer {timer_id}")
+            clean_system = clean_system_name(timer.system)
+            system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+            await ctx.send(f"Removed timer: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})")
             timerboard_channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
             await timerboard.update_timerboard(timerboard_channel)
         else:
+            print(f"{ctx.author} attempted to remove non-existent timer {timer_id}")
             await ctx.send(f"No timer found with ID {timer_id}")
+
+    @commands.command()
+    @commands.check(cmd_channel_check)
+    async def refresh(self, ctx):
+        """Refresh the timerboard by clearing and recreating all messages"""
+        try:
+            logger.info(f"{ctx.author} requested timerboard refresh")
+            channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
+            
+            # Delete all bot messages in the channel
+            deleted = 0
+            async for message in channel.history(limit=100):
+                if message.author == bot.user:
+                    await message.delete()
+                    deleted += 1
+            
+            # Recreate the timerboard
+            await timerboard.update_timerboard(channel)
+            
+            logger.info(f"Timerboard refreshed - deleted {deleted} messages and recreated display")
+            await ctx.send(f"Timerboard refreshed - deleted {deleted} messages and recreated display")
+            
+        except Exception as e:
+            logger.error(f"Error refreshing timerboard: {e}")
+            await ctx.send(f"Error refreshing timerboard: {e}")
+
+    @commands.command()
+    @commands.check(cmd_channel_check)
+    async def staging(self, ctx, system: str):
+        """Set the staging system for the timerboard"""
+        try:
+            logger.info(f"{ctx.author} setting staging system to: {system}")
+            success = await timerboard.set_staging(system, bot.get_channel(TIMERBOARD_CHANNEL_ID))
+            
+            if success:
+                logger.info(f"Staging system set to: {system}")
+                await ctx.send(f"Staging system set to {system}")
+            else:
+                logger.warning(f"Failed to set staging system to: {system}")
+                await ctx.send(f"Failed to set staging system. Please check that {system} is a valid EVE system name.")
+                
+        except Exception as e:
+            logger.error(f"Error setting staging system: {e}")
+            await ctx.send(f"Error setting staging system: {e}")
 
 # Move the commands into the Cog
 async def setup():
@@ -410,3 +639,14 @@ async def setup():
 if __name__ == "__main__":
     asyncio.run(setup())
     bot.run(TOKEN)
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        logger.warning(f"Unknown command '{ctx.message.content}' attempted by {ctx.author} in #{ctx.channel.name}")
+    elif isinstance(error, commands.CheckFailure):
+        logger.warning(f"Command '{ctx.command}' by {ctx.author} rejected - wrong channel (#{ctx.channel.name})")
+        await ctx.send("This command can only be used in the timerboard-cmd channel.")
+    else:
+        logger.error(f"Error executing '{ctx.command}' by {ctx.author}: {error}")
+        await ctx.send(f"Error executing command: {error}")

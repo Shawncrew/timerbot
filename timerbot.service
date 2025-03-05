@@ -1,0 +1,26 @@
+[Unit]
+Description=EVE Online Timer Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=timerbot
+Group=timerbot
+WorkingDirectory=/opt/timerbot/bot
+Environment="PATH=/opt/timerbot/venv/bin"
+ExecStart=/opt/timerbot/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/opt/timerbot/logs/bot.log
+StandardError=append:/opt/timerbot/logs/bot.log
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/timerbot/data /opt/timerbot/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target 
