@@ -165,11 +165,12 @@ class TimerBoard:
         """Load timerboard data from JSON file"""
         try:
             if Path(self.SAVE_FILE).exists():
-                print(f"\nLoading data from {self.SAVE_FILE}...")
+                logger.info(f"Loading timerboard data from {self.SAVE_FILE}")
                 with open(self.SAVE_FILE, 'r') as f:
                     data = json.load(f)
                 
                 self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
+                logger.info(f"Next timer ID set to: {self.next_id}")
                 
                 self.timers = []
                 for timer_data in data.get('timers', []):
@@ -186,21 +187,20 @@ class TimerBoard:
                             gate_distance=timer_data.get('gate_distance')
                         )
                         self.timers.append(timer)
-                        print(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} ({timer.timer_id})")
+                        logger.info(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer.timer_id})")
                     except Exception as e:
-                        print(f"Error loading timer: {e}")
-                        print(f"Timer data: {timer_data}")
+                        logger.error(f"Error loading timer: {e}")
+                        logger.error(f"Timer data: {timer_data}")
                 
-                print(f"\nSuccessfully loaded {len(self.timers)} timers")
-                print(f"Next timer ID set to: {self.next_id}\n")
+                logger.info(f"Successfully loaded {len(self.timers)} timers")
             else:
-                print(f"\nNo save file found at {self.SAVE_FILE}")
-                print("Starting with empty timerboard")
+                logger.info(f"No save file found at {self.SAVE_FILE}")
+                logger.info("Starting with empty timerboard")
                 self.next_id = self.STARTING_TIMER_ID
                 self.timers = []
         except Exception as e:
-            print(f"\nError loading timerboard data: {e}")
-            print("Starting with empty timerboard")
+            logger.error(f"Error loading timerboard data: {e}")
+            logger.info("Starting with empty timerboard")
             self.next_id = self.STARTING_TIMER_ID
             self.timers = []
 
@@ -372,31 +372,35 @@ async def check_timers():
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} has connected to Discord!')
+    logger.info("""
+=====================================
+         Bot Connected
+=====================================
+""")
     
     # Debug channel information
-    print("\nChannel Information:")
-    print(f"Looking for Timerboard channel: {TIMERBOARD_CHANNEL_ID}")
-    print(f"Looking for Commands channel: {TIMERBOARD_CMD_CHANNEL_ID}")
+    logger.info("\nChannel Information:")
+    logger.info(f"Looking for Timerboard channel: {TIMERBOARD_CHANNEL_ID}")
+    logger.info(f"Looking for Commands channel: {TIMERBOARD_CMD_CHANNEL_ID}")
     
     timerboard_channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
     cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
     
     if timerboard_channel:
-        print(f"Found Timerboard channel: #{timerboard_channel.name}")
-        print(f"Can send messages: {timerboard_channel.permissions_for(timerboard_channel.guild.me).send_messages}")
+        logger.info(f"Found Timerboard channel: #{timerboard_channel.name}")
+        logger.info(f"Can send messages: {timerboard_channel.permissions_for(timerboard_channel.guild.me).send_messages}")
     else:
-        print("Could not find Timerboard channel!")
+        logger.error("Could not find Timerboard channel!")
         
     if cmd_channel:
-        print(f"Found Commands channel: #{cmd_channel.name}")
-        print(f"Can send messages: {cmd_channel.permissions_for(cmd_channel.guild.me).send_messages}")
-        print(f"Can read messages: {cmd_channel.permissions_for(cmd_channel.guild.me).read_messages}")
+        logger.info(f"Found Commands channel: #{cmd_channel.name}")
+        logger.info(f"Can send messages: {cmd_channel.permissions_for(cmd_channel.guild.me).send_messages}")
+        logger.info(f"Can read messages: {cmd_channel.permissions_for(cmd_channel.guild.me).read_messages}")
     else:
-        print("Could not find Commands channel!")
+        logger.error("Could not find Commands channel!")
     
     # Continue with normal startup
-    print("\nStarting timer check loop...")
+    logger.info("\nStarting timer check loop...")
     bot.loop.create_task(check_timers())
     
     # Update the timerboard display
@@ -527,3 +531,10 @@ async def on_command_error(ctx, error):
     else:
         logger.error(f"Error executing '{ctx.command}' by {ctx.author}: {error}")
         await ctx.send(f"Error executing command: {error}")
+
+# At the start of the script, right after logger setup:
+logger.info("""
+=====================================
+    EVE Timer Discord Bot Start
+=====================================
+""")
