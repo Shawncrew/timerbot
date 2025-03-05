@@ -4,7 +4,9 @@ import re
 from bot.utils.logger import logger
 from bot.utils.helpers import clean_system_name, cmd_channel_check
 from bot.models.timer import EVE_TZ
-from bot.utils.config import CONFIG  # Import CONFIG directly
+from bot.utils.config import CONFIG
+from discord import app_commands
+from discord import Interaction
 
 class TimerCommands(commands.Cog, name="Basic Commands"):
     def __init__(self, bot, timerboard):
@@ -106,4 +108,72 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
             
         except Exception as e:
             logger.error(f"Error refreshing timerboard: {e}")
-            await ctx.send(f"Error refreshing timerboard: {e}") 
+            await ctx.send(f"Error refreshing timerboard: {e}")
+
+    @app_commands.command(name="add_sov", description="Add a SOV timer")
+    @app_commands.describe(
+        timer="Timer in format YYYY.MM.DD HH:MM",
+        system="System name (e.g. 1DQ1-A)",
+        owner="Current owner of the system (e.g. GOONS)",
+        adm="Current ADM level between 1.0 and 6.0"
+    )
+    async def add_sov(
+        self, 
+        interaction: Interaction, 
+        timer: str,
+        system: str,
+        owner: str,
+        adm: str
+    ):
+        """Add a SOV timer with system ownership and ADM information"""
+        try:
+            # Parse the time
+            try:
+                time = datetime.strptime(timer, '%Y.%m.%d %H:%M')
+                time = EVE_TZ.localize(time)
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ Invalid time format. Use: YYYY.MM.DD HH:MM", 
+                    ephemeral=True
+                )
+                return
+
+            # Validate ADM
+            try:
+                adm_value = float(adm)
+                if not (1 <= adm_value <= 6):
+                    raise ValueError
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ ADM must be a number between 1 and 6", 
+                    ephemeral=True
+                )
+                return
+
+            # Create description with ownership and ADM info
+            description = f"{system} - SOV Timer [{owner}-ADM{adm}]"
+            
+            # Add the timer
+            new_timer, similar_timers = await self.timerboard.add_timer(time, description)
+            
+            if similar_timers:
+                similar_list = "\n".join([t.to_string() for t in similar_timers])
+                await interaction.response.send_message(
+                    f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
+                    f"Added anyway with ID {new_timer.timer_id}"
+                )
+            else:
+                await interaction.response.send_message(
+                    f"✅ Timer added with ID {new_timer.timer_id}"
+                )
+            
+            # Update timerboard channel
+            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
+            await self.timerboard.update_timerboard(timerboard_channel)
+            
+        except Exception as e:
+            logger.error(f"Error adding SOV timer: {e}")
+            await interaction.response.send_message(
+                f"❌ Error adding timer: {str(e)}", 
+                ephemeral=True
+            ) 

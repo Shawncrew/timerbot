@@ -6,11 +6,10 @@ After=network.target
 Type=simple
 User=timerbot
 Group=timerbot
-WorkingDirectory=/opt/timerbot/bot
-Environment="PATH=/opt/timerbot/venv/bin"
-ExecStart=/opt/timerbot/venv/bin/python bot.py
+WorkingDirectory=/opt/timerbot
+ExecStart=/usr/bin/python3 -m bot.main
 Restart=always
-RestartSec=10
+RestartSec=60
 
 # Logging
 StandardOutput=append:/opt/timerbot/logs/bot.log
