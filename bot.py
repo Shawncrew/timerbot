@@ -181,7 +181,7 @@ class TimerBoard:
                             timer_id=timer_data['timer_id'],
                             system=timer_data['system'],
                             structure_name=timer_data['structure_name'],
-                            notes=timer_data.get('location', ''),
+                            notes=timer_data.get('notes', ''),
                             message_id=timer_data.get('message_id'),
                             gate_distance=timer_data.get('gate_distance')
                         )
