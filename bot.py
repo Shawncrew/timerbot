@@ -409,11 +409,12 @@ async def check_timers():
         try:
             now = datetime.datetime.now(EVE_TZ)
             
-            # Check for timers that are about to happen
+            # Check for timers that are about to happen or starting now
             for timer in timerboard.timers:
                 time_until = timer.time - now
                 minutes_until = time_until.total_seconds() / 60
                 
+                # Check for notification time (e.g. 60 minutes before)
                 if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
                     cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
                     if cmd_channel:
@@ -422,6 +423,16 @@ async def check_timers():
                         notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
                         await cmd_channel.send(notification)
                         logger.info(f"Sent notification for timer {timer.timer_id}")
+                
+                # Check for timer start (within 1 minute of start time)
+                elif -1 <= minutes_until < 1:  # Within 1 minute of timer time
+                    cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
+                    if cmd_channel:
+                        clean_system = clean_system_name(timer.system)
+                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+                        alert = f"🚨 **TIMER STARTING NOW**: {system_link} - {timer.structure_name} {timer.notes} (ID: {timer.timer_id})"
+                        await cmd_channel.send(alert)
+                        logger.info(f"Sent start alert for timer {timer.timer_id}")
             
             # Check for expired timers
             expired = timerboard.remove_expired()
