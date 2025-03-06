@@ -35,47 +35,55 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Initialize timerboard
 timerboard = TimerBoard()
+alerted_timers = set()  # Track which timers we've already alerted for
 
 async def check_timers():
+    """Check for timers that are about to start and alert if needed"""
     await bot.wait_until_ready()
     logger.info("Starting timer check loop...")
+    
     while not bot.is_closed():
         try:
             now = datetime.datetime.now(EVE_TZ)
             
-            # Check for timers that are about to happen or starting now
-            for timer in timerboard.timers:
-                time_until = timer.time - now
-                minutes_until = time_until.total_seconds() / 60
-                
-                # Check for notification time (e.g. 60 minutes before)
-                if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
-                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
-                    if cmd_channel:
-                        clean_system = clean_system_name(timer.system)
-                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
-                        notification = f"⚠️ Timer in {CONFIG['notification_time']} minutes: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
-                        await cmd_channel.send(notification)
-                        logger.info(f"Sent notification for timer {timer.timer_id}")
-                
-                # Check for timer start (within 1 minute of start time)
-                elif -1 <= minutes_until < 1:  # Within 1 minute of timer time
-                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
-                    if cmd_channel:
-                        clean_system = clean_system_name(timer.system)
-                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
-                        alert = f"🚨 **TIMER STARTING NOW**: {system_link} - {timer.structure_name} {timer.notes} (ID: {timer.timer_id})"
-                        await cmd_channel.send(alert)
-                        logger.info(f"Sent start alert for timer {timer.timer_id}")
+            # Get all timers that are within the next hour
+            upcoming_timers = [
+                timer for timer in timerboard.timers 
+                if timer.time > now 
+                and (timer.time - now).total_seconds() <= 3600
+            ]
             
-            # Check for expired timers
+            for timer in upcoming_timers:
+                time_until = (timer.time - now).total_seconds() / 60
+                
+                # Alert at 60 minutes if not already alerted
+                if 59 <= time_until <= 60 and timer.timer_id not in alerted_timers:
+                    logger.info(f"Timer in 60 minutes: {timer.system} - {timer.structure_name}")
+                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
+                    if cmd_channel:
+                        await cmd_channel.send(
+                            f"⚠️ Timer in 60 minutes: {timer.system} - {timer.structure_name} at {timer.time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {timer.timer_id})"
+                        )
+                        alerted_timers.add(timer.timer_id)
+                
+                # Alert at start time if not already alerted
+                elif 0 <= time_until <= 1 and timer.timer_id not in alerted_timers:
+                    logger.info(f"Timer starting now: {timer.system} - {timer.structure_name}")
+                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
+                    if cmd_channel:
+                        await cmd_channel.send(
+                            f"🚨 **TIMER STARTING NOW**: {timer.system} - {timer.structure_name} (ID: {timer.timer_id})"
+                        )
+                        alerted_timers.add(timer.timer_id)
+            
+            # Clean up expired timers from alerted set
             expired = timerboard.remove_expired()
             if expired:
-                logger.info(f"Removed {len(expired)} expired timers:")
                 for timer in expired:
-                    logger.info(f"- {timer.to_string()}")
-                channel = bot.get_channel(CONFIG['channels']['timerboard'])
-                await timerboard.update_timerboard(channel)
+                    alerted_timers.discard(timer.timer_id)
+                timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
+                if timerboard_channel:
+                    await timerboard.update_timerboard(timerboard_channel)
             
             await asyncio.sleep(CONFIG['check_interval'])
             
