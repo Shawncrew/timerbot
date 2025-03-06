@@ -15,7 +15,7 @@ SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
 @dataclass
 class Timer:
     time: datetime.datetime
-    description: str
+    description: str  # Full input description for reference
     timer_id: int
     system: str = ""
     structure_name: str = ""
@@ -23,9 +23,10 @@ class Timer:
     message_id: Optional[int] = None
 
     def to_string(self) -> str:
+        """Format timer for display"""
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
-        notes_str = f" {self.notes.strip('[]')}" if self.notes else ""
-        return f"```{time_str}```  {self.system} - {self.structure_name}  {notes_str} ({self.timer_id})"
+        # Don't add notes_str since they're already in structure_name or will be added by the display code
+        return f"```{time_str}```  {self.system} - {self.structure_name} ({self.timer_id})"
 
     def is_similar(self, other: 'Timer') -> bool:
         time_diff = abs((self.time - other.time).total_seconds()) / 60
@@ -136,28 +137,24 @@ class TimerBoard:
     async def add_timer(self, time: datetime.datetime, description: str) -> tuple[Timer, list[Timer]]:
         """Add a new timer and return it along with any similar timers found"""
         # Parse system and structure name from description
-        system_match = re.match(r'([A-Z0-9-]+)(\s*[»«].*?)(?=\s+\d+,\d+\s+km|\n|$)', description)
+        system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
         if system_match:
             system = system_match.group(1).strip()
-            structure_name = (system + system_match.group(2)).strip()
-            logger.info(f"Adding timer in system: {system} (structure: {structure_name})")
+            structure_name = system_match.group(2).strip()
+            
+            # Extract notes (everything after the structure name in square brackets)
+            notes_match = re.search(r'(\[.*\](?:\[.*\])*$)', description)
+            notes = notes_match.group(1) if notes_match else ""
+            
+            logger.debug(f"Parsed timer: system={system}, structure={structure_name}, notes={notes}")
         else:
-            system_match = re.match(r'([^\s-]+(?:-[^\s]+)?)\s*-\s*(.+?)(?:\n|$)', description)
-            if system_match:
-                system = system_match.group(1).strip()
-                structure_name = system_match.group(2).strip()
-                logger.info(f"Adding timer with system: {system}")
-            else:
-                system = ""
-                structure_name = description
-
-        # Extract notes tags if present
-        notes_match = re.search(r'\[(.*?)\](?:\[(.*?)\])*$', description)
-        notes = notes_match.group(0) if notes_match else ""
+            system = ""
+            structure_name = description
+            notes = ""
 
         new_timer = Timer(
             time=time,
-            description=description,
+            description=description,  # Keep full description for reference
             timer_id=self.next_id,
             system=system,
             structure_name=structure_name,
@@ -214,10 +211,12 @@ class TimerBoard:
                 clean_system = clean_system_name(timer.system)
                 system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                 
+                # Include notes only if they exist
+                notes_str = f" {timer.notes}" if timer.notes else ""
                 timer_line = (
                     f"`{time_str}` "
                     f"{system_link} - "
-                    f"{timer.structure_name} {timer.notes} "
+                    f"{timer.structure_name}{notes_str} "
                     f"({timer.timer_id})\n"
                 )
                 
