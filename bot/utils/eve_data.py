@@ -6,7 +6,12 @@ from .logger import logger
 # Load system -> region mapping from a JSON file
 def load_system_data() -> Dict[str, str]:
     try:
-        data_file = Path(__file__).parent / 'eve_systems.json'
+        # Use absolute path based on the data directory
+        data_file = Path('/opt/timerbot/data/eve_systems.json')
+        if not data_file.exists():
+            # Fallback to the utils directory
+            data_file = Path(__file__).parent / 'eve_systems.json'
+        
         with open(data_file, 'r') as f:
             return json.load(f)
     except Exception as e:

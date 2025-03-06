@@ -105,7 +105,11 @@ async def main():
     system_to_region = await fetch_universe_data()
     
     if system_to_region:
-        output_file = Path(__file__).parent / 'eve_systems.json'
+        # Save to data directory
+        data_dir = Path('/opt/timerbot/data')
+        data_dir.mkdir(parents=True, exist_ok=True)
+        output_file = data_dir / 'eve_systems.json'
+        
         with open(output_file, 'w') as f:
             json.dump(system_to_region, f, indent=2, sort_keys=True)
         logger.info(f"Successfully created {output_file} with {len(system_to_region)} systems")
