@@ -163,12 +163,13 @@ class TimerBoard:
         
         # Check for duplicates
         similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
-        if not similar_timers:
-            self.timers.append(new_timer)
-            self.next_id += 1
-            self.sort_timers()
-            self.save_data()
-            return new_timer, []
+        
+        # Always add the timer, even if there are similar ones
+        self.timers.append(new_timer)
+        self.next_id += 1
+        self.sort_timers()
+        self.save_data()
+        
         return new_timer, similar_timers
 
     def remove_timer(self, timer_id: int) -> Optional[Timer]:
