@@ -7,47 +7,83 @@ from bot.models.timer import EVE_TZ
 from bot.utils.config import CONFIG
 from discord import app_commands
 from discord import Interaction
+import discord
 
-class TimerCommands(commands.Cog, name="Basic Commands"):
+class TimerCommands(commands.GroupCog, name="timer"):
     def __init__(self, bot, timerboard):
         self.bot = bot
         self.timerboard = timerboard
+        super().__init__()
 
     @commands.command()
     @commands.check(cmd_channel_check)
     async def add(self, ctx, *, input_text: str):
         """Add a new timer
         Format: !add YYYY-MM-DD HH:MM:SS system - structure [tags]
-        or: !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]"""
+        or: !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+        or: !add structure_name\ndistance\nReinforced until YYYY.MM.DD HH:MM:SS [tags]"""
         try:
-            # Look for "Reinforced until" pattern with optional location tags
-            reinforced_match = re.search(r'(.*?)Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})(?:\s+(\[.*\]))?', input_text)
-            if reinforced_match:
-                # Extract system, structure name, and location info
-                prefix = reinforced_match.group(1).strip()
-                time_str = reinforced_match.group(2).replace('.', '-')
-                tags = reinforced_match.group(3) if reinforced_match.group(3) else ""
+            # Look for the new format first (structure name on first line, distance on second, reinforced on third)
+            lines = input_text.split('\n')
+            if len(lines) >= 3 and 'Reinforced until' in lines[2]:
+                # Extract structure name from first line
+                structure_name = lines[0].strip()
                 
-                # Extract system and structure name from prefix
-                system_structure_match = re.match(r'([^\s]+)\s+(.+?)(?:\s+\d+\s*km)?$', prefix)
-                if system_structure_match:
-                    system = system_structure_match.group(1)
-                    structure = system_structure_match.group(2)
-                    description = f"{system} - {structure} {tags}"
+                # Extract system from structure name if it contains it in parentheses
+                system_match = re.search(r'\(([\w-]+)[^\)]*\)', structure_name)
+                system = system_match.group(1) if system_match else ""
+                
+                # Extract time from the "Reinforced until" line
+                time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})', lines[2])
+                if time_match:
+                    time_str = time_match.group(1).replace('.', '-')
+                    
+                    # Extract notes/tags from the end of the reinforced line
+                    notes_match = re.search(r'\[(.*?)\](?:\[(.*?)\])*$', lines[2])
+                    notes = notes_match.group(0) if notes_match else ""
+                    
+                    description = f"{system} - {structure_name} {notes}"
                 else:
-                    description = input_text
-            else:
-                # Try to parse the first part as a direct time input
-                parts = input_text.split(' ', 1)
-                if len(parts) < 2:
-                    await ctx.send("Invalid format. Use: !add YYYY-MM-DD HH:MM:SS description")
+                    await ctx.send("Invalid reinforced time format")
                     return
-                time_str = parts[0]
-                description = parts[1]
+                    
+            else:
+                # Try existing formats
+                reinforced_match = re.search(r'(.*?)Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})(?:\s+(\[.*\]))?', input_text)
+                if reinforced_match:
+                    # Extract system, structure name, and location info
+                    prefix = reinforced_match.group(1).strip()
+                    time_str = reinforced_match.group(2).replace('.', '-')
+                    tags = reinforced_match.group(3) if reinforced_match.group(3) else ""
+                    
+                    # Extract system and structure name from prefix
+                    system_structure_match = re.match(r'([^\s]+)\s+(.+?)(?:\s+\d+\s*km)?$', prefix)
+                    if system_structure_match:
+                        system = system_structure_match.group(1)
+                        structure = system_structure_match.group(2)
+                        description = f"{system} - {structure} {tags}"
+                    else:
+                        description = input_text
+                else:
+                    # Try to parse the first part as a direct time input
+                    parts = input_text.split(' ', 1)
+                    if len(parts) < 2:
+                        await ctx.send("Invalid format. Use: !add YYYY-MM-DD HH:MM:SS description")
+                        return
+                    time_str = parts[0]
+                    description = parts[1]
 
             # Parse the time
-            time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
-            time = EVE_TZ.localize(time)
+            try:
+                if 'time_str' in locals():
+                    time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+                else:
+                    await ctx.send("Could not parse time from input")
+                    return
+                time = EVE_TZ.localize(time)
+            except ValueError as e:
+                await ctx.send(f"Invalid time format: {e}")
+                return
             
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
@@ -60,12 +96,13 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
                 logger.info(f"{ctx.author} added timer {new_timer.timer_id}")
                 await ctx.send(f"Timer added with ID {new_timer.timer_id}")
             
-            # Update timerboard channel - use CONFIG directly
+            # Update timerboard channel
             timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
             await self.timerboard.update_timerboard(timerboard_channel)
             
-        except ValueError as e:
-            await ctx.send("Invalid time format. Use: YYYY-MM-DD HH:MM:SS or system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]")
+        except Exception as e:
+            logger.error(f"Error adding timer: {e}")
+            await ctx.send(f"Error adding timer: {e}")
 
     @commands.command()
     @commands.check(cmd_channel_check)
@@ -110,22 +147,16 @@ class TimerCommands(commands.Cog, name="Basic Commands"):
             logger.error(f"Error refreshing timerboard: {e}")
             await ctx.send(f"Error refreshing timerboard: {e}")
 
-    @app_commands.command(name="add_sov", description="Add a SOV timer")
-    @app_commands.describe(
-        timer="Timer in format YYYY.MM.DD HH:MM",
-        system="System name (e.g. 1DQ1-A)",
-        owner="Current owner of the system (e.g. GOONS)",
-        adm="Current ADM level between 1.0 and 6.0"
-    )
+    @app_commands.command()
     async def add_sov(
         self, 
-        interaction: Interaction, 
+        interaction: discord.Interaction, 
         timer: str,
         system: str,
         owner: str,
         adm: str
     ):
-        """Add a SOV timer with system ownership and ADM information"""
+        """Add a SOV timer"""
         try:
             # Parse the time
             try:

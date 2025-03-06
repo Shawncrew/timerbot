@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import datetime
+from discord import app_commands
 
 # Use relative imports since we're inside the bot package
 from bot.utils.config import load_config, load_token
@@ -29,7 +30,11 @@ TOKEN = load_token()
 # Bot setup
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Add this line to enable slash commands
+tree = app_commands.CommandTree(bot)
 
 # Initialize timerboard
 timerboard = TimerBoard()
@@ -85,9 +90,6 @@ async def check_timers():
 async def on_ready():
     logger.info(f"Bot connected as {bot.user}")
     
-    # Sync commands
-    await sync_commands()
-    
     # Debug channel information
     logger.info("Checking channels:")
     logger.info(f"Timerboard channel: {CONFIG['channels']['timerboard']}")
@@ -128,15 +130,11 @@ async def on_command_error(ctx, error):
         await ctx.send(f"Error executing command: {error}")
 
 async def setup():
-    await bot.add_cog(TimerCommands(bot, timerboard))
-
-# Add this function
-async def sync_commands():
-    """Sync slash commands with Discord"""
+    cog = TimerCommands(bot, timerboard)
+    await bot.add_cog(cog)
     try:
-        logger.info("Syncing commands with Discord...")
-        await bot.tree.sync()
-        logger.info("Commands synced successfully")
+        synced = await bot.tree.sync()
+        logger.info(f"Synced {len(synced)} commands")
     except Exception as e:
         logger.error(f"Error syncing commands: {e}")
 
