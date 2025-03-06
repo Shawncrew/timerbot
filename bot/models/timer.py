@@ -140,45 +140,62 @@ class TimerBoard:
 
     async def add_timer(self, time: datetime.datetime, description: str) -> tuple[Timer, list[Timer]]:
         """Add a new timer and return it along with any similar timers found"""
-        # Parse system and structure name from description
-        system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
-        if system_match:
-            system = system_match.group(1).strip()
-            structure_name = system_match.group(2).strip()
-            
-            # Extract notes (everything after the structure name in square brackets)
-            notes_match = re.search(r'(\[.*\](?:\[.*\])*$)', description)
-            notes = notes_match.group(1) if notes_match else ""
-            
-            logger.debug(f"Parsed timer: system={system}, structure={structure_name}, notes={notes}")
-        else:
-            system = ""
-            structure_name = description
-            notes = ""
+        try:
+            # Parse system and structure name from description
+            system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
+            if system_match:
+                system = system_match.group(1).strip()
+                structure_name = system_match.group(2).strip()
+                
+                # Extract notes (everything after the structure name in square brackets)
+                notes_match = re.search(r'(\[.*\](?:\[.*\])*$)', description)
+                notes = notes_match.group(1) if notes_match else ""
+                
+                # Get region info
+                region = get_region(system)
+                logger.info(f"Adding timer in {system} ({region})")
+                logger.info(f"Structure: {structure_name}")
+                logger.info(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
+                if notes:
+                    logger.info(f"Tags: {notes}")
+            else:
+                system = ""
+                structure_name = description
+                notes = ""
+                logger.warning(f"Could not parse system from description: {description}")
 
-        # Look up region for the system
-        region = get_region(system) if system else ""
-        
-        new_timer = Timer(
-            time=time,
-            description=description,
-            timer_id=self.next_id,
-            system=system,
-            structure_name=structure_name,
-            notes=notes,
-            region=region  # Add region to timer
-        )
-        
-        # Check for duplicates
-        similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
-        
-        # Always add the timer, even if there are similar ones
-        self.timers.append(new_timer)
-        self.next_id += 1
-        self.sort_timers()
-        self.save_data()
-        
-        return new_timer, similar_timers
+            # Look up region for the system
+            region = get_region(system) if system else ""
+            
+            new_timer = Timer(
+                time=time,
+                description=description,
+                timer_id=self.next_id,
+                system=system,
+                structure_name=structure_name,
+                notes=notes,
+                region=region
+            )
+            
+            # Check for duplicates
+            similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
+            if similar_timers:
+                logger.warning(f"Found {len(similar_timers)} similar timers:")
+                for t in similar_timers:
+                    logger.warning(f"  - ID {t.timer_id}: {t.system} - {t.structure_name} at {t.time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Always add the timer
+            self.timers.append(new_timer)
+            self.next_id += 1
+            self.sort_timers()
+            self.save_data()
+            
+            logger.info(f"Successfully added timer with ID {new_timer.timer_id}")
+            return new_timer, similar_timers
+            
+        except Exception as e:
+            logger.error(f"Error adding timer: {e}")
+            raise
 
     def remove_timer(self, timer_id: int) -> Optional[Timer]:
         """Remove a timer by its ID"""
@@ -186,7 +203,15 @@ class TimerBoard:
             if timer.timer_id == timer_id:
                 self.timers.remove(timer)
                 self.save_data()
+                logger.info(f"Removed timer {timer_id}:")
+                logger.info(f"  System: {timer.system} ({timer.region})")
+                logger.info(f"  Structure: {timer.structure_name}")
+                logger.info(f"  Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
+                if timer.notes:
+                    logger.info(f"  Tags: {timer.notes}")
                 return timer
+                
+        logger.warning(f"Attempted to remove non-existent timer {timer_id}")
         return None
 
     def remove_expired(self) -> list[Timer]:
@@ -198,7 +223,12 @@ class TimerBoard:
         
         if expired:
             self.timers = [t for t in self.timers if t.time >= expiry_threshold]
-            logger.info(f"Removed {len(expired)} expired timers")
+            logger.info(f"Removing {len(expired)} expired timers:")
+            for timer in expired:
+                logger.info(f"  - ID {timer.timer_id}: {timer.system} ({timer.region}) - {timer.structure_name}")
+                logger.info(f"    Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
+                if timer.notes:
+                    logger.info(f"    Tags: {timer.notes}")
             self.save_data()
         
         return expired
