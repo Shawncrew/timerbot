@@ -26,7 +26,7 @@ class TimerCommands(commands.GroupCog, name="timer"):
             # Look for the new format first (structure name on first line, distance on second, reinforced on third)
             lines = input_text.split('\n')
             if len(lines) >= 3 and 'Reinforced until' in lines[2]:
-                # Extract structure name from first line
+                # Extract structure name from first line (keep it as is, including any tags)
                 structure_name = lines[0].strip()
                 
                 # Extract system from structure name if it contains it in parentheses
@@ -34,14 +34,14 @@ class TimerCommands(commands.GroupCog, name="timer"):
                 system = system_match.group(1) if system_match else ""
                 
                 # Extract time from the "Reinforced until" line
-                time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})', lines[2])
+                time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})(.*?)$', lines[2])
                 if time_match:
                     time_str = time_match.group(1).replace('.', '-')
                     
-                    # Extract notes/tags from the end of the reinforced line
-                    notes_match = re.search(r'\[(.*?)\](?:\[(.*?)\])*$', lines[2])
-                    notes = notes_match.group(0) if notes_match else ""
+                    # Extract notes/tags from the end of the reinforced line only
+                    notes = time_match.group(2).strip() if time_match.group(2) else ""
                     
+                    # Keep the structure name as is, only add the reinforced line notes
                     description = f"{system} - {structure_name} {notes}"
                 else:
                     await ctx.send("Invalid reinforced time format")
