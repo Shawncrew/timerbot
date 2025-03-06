@@ -33,16 +33,15 @@ class TimerCommands(commands.GroupCog, name="timer"):
                 system_match = re.search(r'\(([\w-]+)[^\)]*\)', structure_name)
                 system = system_match.group(1) if system_match else ""
                 
-                # Extract time from the "Reinforced until" line
-                time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})(.*?)$', lines[2])
+                # Extract time and tags from the "Reinforced until" line
+                # This pattern will match: "Reinforced until YYYY.MM.DD HH:MM:SS" and capture any tags after it
+                time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[2])
                 if time_match:
                     time_str = time_match.group(1).replace('.', '-')
+                    reinforced_tags = time_match.group(2) if time_match.group(2) else ""
                     
-                    # Extract notes/tags from the end of the reinforced line only
-                    notes = time_match.group(2).strip() if time_match.group(2) else ""
-                    
-                    # Keep the structure name as is, only add the reinforced line notes
-                    description = f"{system} - {structure_name} {notes}"
+                    # Create description with structure name and reinforced tags
+                    description = f"{system} - {structure_name} {reinforced_tags}"
                 else:
                     await ctx.send("Invalid reinforced time format")
                     return
