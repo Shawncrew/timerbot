@@ -92,12 +92,10 @@ class TimerCommands(commands.GroupCog, name="timer"):
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
             if similar_timers:
-                logger.info(f"{ctx.author} added timer {new_timer.timer_id} with similar timers warning")
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
                 await ctx.send(f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
                              f"Added anyway with ID {new_timer.timer_id}")
             else:
-                logger.info(f"{ctx.author} added timer {new_timer.timer_id}")
                 await ctx.send(f"Timer added with ID {new_timer.timer_id}")
             
             # Update timerboard channel

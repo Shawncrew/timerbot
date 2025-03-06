@@ -1,39 +1,33 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+import sys
+from pathlib import Path
 
-LOG_DIR = "/opt/timerbot/logs"
+# Create logger
+logger = logging.getLogger('timerbot')
+logger.setLevel(logging.INFO)
 
-def setup_logger():
-    """Configure and return the logger"""
-    # Create log directory
-    os.makedirs(LOG_DIR, exist_ok=True)
-    
-    # Configure logging
-    logger = logging.getLogger('timerbot')
-    logger.setLevel(logging.INFO)
-    
-    # Add rotating file handler (10 files, 10MB each)
-    handler = RotatingFileHandler(
-        f"{LOG_DIR}/bot.log",
-        maxBytes=10_000_000,
-        backupCount=10
+# Only add handlers if none exist
+if not logger.handlers:
+    # Create formatters
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', 
+                                datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # Create file handler
+    log_dir = Path('/opt/timerbot/logs')
+    log_dir.mkdir(parents=True, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        log_dir / 'timerbot.log',
+        maxBytes=1024*1024,  # 1MB
+        backupCount=5
     )
-    
-    # Format for log messages
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    
-    # Also log to console
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    logger.addHandler(console)
-    
-    return logger
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
-# Create a global logger instance
-logger = setup_logger() 
+# Prevent propagation to root logger
+logger.propagate = False 
