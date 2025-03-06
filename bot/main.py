@@ -87,6 +87,13 @@ async def check_timers():
 async def on_ready():
     logger.info(f"Bot connected as {bot.user}")
     
+    # Sync commands after bot is ready
+    try:
+        synced = await bot.tree.sync()
+        logger.info(f"Synced {len(synced)} commands")
+    except Exception as e:
+        logger.error(f"Error syncing commands: {e}")
+    
     # Debug channel information
     logger.info("Checking channels:")
     logger.info(f"Timerboard channel: {CONFIG['channels']['timerboard']}")
@@ -129,11 +136,6 @@ async def on_command_error(ctx, error):
 async def setup():
     cog = TimerCommands(bot, timerboard)
     await bot.add_cog(cog)
-    try:
-        synced = await bot.tree.sync()
-        logger.info(f"Synced {len(synced)} commands")
-    except Exception as e:
-        logger.error(f"Error syncing commands: {e}")
 
 if __name__ == "__main__":
     asyncio.run(setup())
