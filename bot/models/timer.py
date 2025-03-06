@@ -8,6 +8,7 @@ import pytz
 from bot.utils.logger import logger
 from bot.utils.helpers import clean_system_name
 from bot.utils.config import CONFIG
+from bot.utils.eve_data import get_region
 
 EVE_TZ = pytz.timezone('UTC')
 SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
@@ -21,12 +22,13 @@ class Timer:
     structure_name: str = ""
     notes: str = ""
     message_id: Optional[int] = None
+    region: str = ""  # Add region field
 
     def to_string(self) -> str:
         """Format timer for display"""
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         # Don't add notes_str since they're already in structure_name or will be added by the display code
-        return f"```{time_str}```  {self.system} - {self.structure_name} ({self.timer_id})"
+        return f"```{time_str}```  {self.system} ({self.region}) - {self.structure_name} ({self.timer_id})"
 
     def is_similar(self, other: 'Timer') -> bool:
         time_diff = abs((self.time - other.time).total_seconds()) / 60
@@ -57,7 +59,8 @@ class TimerBoard:
                     'system': timer.system,
                     'structure_name': timer.structure_name,
                     'notes': timer.notes,
-                    'message_id': timer.message_id
+                    'message_id': timer.message_id,
+                    'region': timer.region  # Add region to saved data
                 }
                 for timer in self.timers
             ]
@@ -107,7 +110,8 @@ class TimerBoard:
                         system=timer_data['system'],
                         structure_name=timer_data['structure_name'],
                         notes=timer_data.get('notes', ''),
-                        message_id=timer_data.get('message_id')
+                        message_id=timer_data.get('message_id'),
+                        region=timer_data.get('region', get_region(timer_data['system']))  # Load region or look it up
                     )
                     self.timers.append(timer)
                     logger.info(f"Loaded timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer.timer_id})")
@@ -152,13 +156,17 @@ class TimerBoard:
             structure_name = description
             notes = ""
 
+        # Look up region for the system
+        region = get_region(system) if system else ""
+        
         new_timer = Timer(
             time=time,
-            description=description,  # Keep full description for reference
+            description=description,
             timer_id=self.next_id,
             system=system,
             structure_name=structure_name,
-            notes=notes
+            notes=notes,
+            region=region  # Add region to timer
         )
         
         # Check for duplicates
@@ -216,7 +224,7 @@ class TimerBoard:
                 notes_str = f" {timer.notes}" if timer.notes else ""
                 timer_line = (
                     f"`{time_str}` "
-                    f"{system_link} - "
+                    f"{system_link} ({timer.region}) - "  # Add region to display
                     f"{timer.structure_name}{notes_str} "
                     f"({timer.timer_id})\n"
                 )
