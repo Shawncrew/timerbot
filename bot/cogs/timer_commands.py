@@ -26,14 +26,19 @@ class TimerCommands(commands.GroupCog, name="timer"):
             # Look for the new format first (structure name on first line, distance on second, reinforced on third)
             lines = input_text.split('\n')
             if len(lines) >= 3 and 'Reinforced until' in lines[2]:
-                # Keep the exact structure name from first line, including its own tags
+                # Keep the exact structure name from first line
                 structure_name = lines[0].strip()
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
-                # Extract system from structure name if it contains it in parentheses
-                system_match = re.search(r'\(([\w-]+)[^\)]*\)', structure_name)
-                system = system_match.group(1) if system_match else ""
-                logger.debug(f"Extracted system: {system}")
+                # Extract system from structure name
+                system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)$', structure_name)
+                if system_match:
+                    system = system_match.group(1).strip()
+                    structure_name = system_match.group(2).strip()
+                else:
+                    await ctx.send("Could not parse system name from structure")
+                    return
+                logger.debug(f"Extracted system: {system}, structure: {structure_name}")
                 
                 # Extract time and tags from the "Reinforced until" line
                 time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[2])
@@ -42,7 +47,7 @@ class TimerCommands(commands.GroupCog, name="timer"):
                     reinforced_tags = time_match.group(2) if time_match.group(2) else ""
                     logger.debug(f"Extracted reinforced tags: {reinforced_tags}")
                     
-                    # Create description with full structure name (including its tags) and reinforced tags
+                    # Create description with system and structure name
                     description = f"{system} - {structure_name}"
                     if reinforced_tags:  # Only add reinforced tags if they exist
                         description += f" {reinforced_tags}"
