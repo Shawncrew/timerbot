@@ -30,7 +30,7 @@ class Timer:
         clean_system = clean_system_name(self.system)
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         notes_str = f" {self.notes}" if self.notes else ""
-        return f"```{time_str}```  {system_link} ({self.region}) - {self.structure_name}{notes_str} ({self.timer_id})"
+        return f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}{notes_str} ({self.timer_id})"
 
     def is_similar(self, other: 'Timer') -> bool:
         time_diff = abs((self.time - other.time).total_seconds()) / 60
@@ -255,7 +255,7 @@ class TimerBoard:
                 # Include notes only if they exist
                 notes_str = f" {timer.notes}" if timer.notes else ""
                 timer_line = (
-                    f"`{time_str}` "
+                    f"`{time_str}` "  # Use single backtick for smaller font
                     f"{system_link} ({timer.region}) - "
                     f"{timer.structure_name}{notes_str} "
                     f"({timer.timer_id})\n"
