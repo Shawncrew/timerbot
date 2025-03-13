@@ -30,11 +30,16 @@ class TimerCommands(commands.GroupCog, name="timer"):
                 structure_name = lines[0].strip()
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
-                # Extract system from structure name
-                system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)$', structure_name)
+                # Extract system from structure name - handle special characters like »
+                system_match = re.match(r'([A-Z0-9-]+)(?:\s*[»>]\s*.*)?(?:\s*-\s*.*)?$', structure_name)
                 if system_match:
                     system = system_match.group(1).strip()
-                    structure_name = system_match.group(2).strip()
+                    # Keep the full structure name as is
+                    structure_name = structure_name[len(system):].strip()
+                    if structure_name.startswith('»'):
+                        structure_name = structure_name.strip('» ')
+                    if structure_name.startswith('-'):
+                        structure_name = structure_name.strip('- ')
                 else:
                     await ctx.send("Could not parse system name from structure")
                     return
