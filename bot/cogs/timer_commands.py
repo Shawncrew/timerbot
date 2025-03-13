@@ -30,13 +30,24 @@ class TimerCommands(commands.GroupCog, name="timer"):
                 structure_name = lines[0].strip()
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
-                # Extract system from structure name - handle special characters like »
+                # Extract system from structure name
                 system_match = re.match(r'([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
                 if system_match:
                     system = system_match.group(1).strip()
-                    # Keep the full original structure name
-                    structure_name = structure_name.strip()
-                    logger.debug(f"Parsed system: {system}, structure: {structure_name}")
+                    
+                    # Check if this is an Ansiblex (has » character or [Ansiblex] tag)
+                    is_ansiblex = '»' in structure_name or '[Ansiblex]' in lines[2]
+                    
+                    if is_ansiblex:
+                        # For Ansiblex, keep the full structure name including the system
+                        structure_name = structure_name.strip()
+                    else:
+                        # For non-Ansiblex, remove the system name and dash
+                        structure_name = structure_name[len(system):].strip()
+                        if structure_name.startswith('-'):
+                            structure_name = structure_name[1:].strip()
+                            
+                    logger.debug(f"Parsed system: {system}, structure: {structure_name}, is_ansiblex: {is_ansiblex}")
                 else:
                     await ctx.send("Could not parse system name from structure")
                     return
