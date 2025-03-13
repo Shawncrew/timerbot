@@ -31,19 +31,15 @@ class TimerCommands(commands.GroupCog, name="timer"):
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
                 # Extract system from structure name - handle special characters like »
-                system_match = re.match(r'([A-Z0-9-]+)(?:\s*[»>]\s*.*)?(?:\s*-\s*.*)?$', structure_name)
+                system_match = re.match(r'([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
                 if system_match:
                     system = system_match.group(1).strip()
-                    # Keep the full structure name as is
-                    structure_name = structure_name[len(system):].strip()
-                    if structure_name.startswith('»'):
-                        structure_name = structure_name.strip('» ')
-                    if structure_name.startswith('-'):
-                        structure_name = structure_name.strip('- ')
+                    # Keep the full original structure name
+                    structure_name = structure_name.strip()
+                    logger.debug(f"Parsed system: {system}, structure: {structure_name}")
                 else:
                     await ctx.send("Could not parse system name from structure")
                     return
-                logger.debug(f"Extracted system: {system}, structure: {structure_name}")
                 
                 # Extract time and tags from the "Reinforced until" line
                 time_match = re.search(r'Reinforced until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[2])
