@@ -15,6 +15,21 @@ class TimerCommands(commands.GroupCog, name="timer"):
         self.timerboard = timerboard
         super().__init__()
 
+    HELP_TEXT = """Invalid format. Please use one of these formats:
+
+1. !add YYYY-MM-DD HH:MM:SS system - structure [tags]
+or
+2. !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+or
+3. !add <copy text from selected item> [alliance ticker][structure type][timer type]
+
+Example:
+!add 4M-QXK - PRIVATE MATSUNOMI P4M3
+38.4 AU
+Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+
+Note: Medium structures should use "HULL" since there is only one timer."""
+
     @commands.command()
     @commands.check(cmd_channel_check)
     async def add(self, ctx, *, input_text: str):
@@ -100,7 +115,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     # Try to parse the first part as a direct time input
                     parts = input_text.split(' ', 1)
                     if len(parts) < 2:
-                        await ctx.send("Invalid format. Use: !add YYYY-MM-DD HH:MM:SS description")
+                        await ctx.send(self.HELP_TEXT)
                         return
                     time_str = parts[0]
                     description = parts[1]
@@ -110,11 +125,11 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                 if 'time_str' in locals():
                     time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
                 else:
-                    await ctx.send("Could not parse time from input")
+                    await ctx.send(self.HELP_TEXT)
                     return
                 time = EVE_TZ.localize(time)
             except ValueError as e:
-                await ctx.send(f"Invalid time format: {e}")
+                await ctx.send(f"Invalid time format. {self.HELP_TEXT}")
                 return
             
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
