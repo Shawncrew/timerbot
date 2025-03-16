@@ -19,9 +19,20 @@ class TimerCommands(commands.GroupCog, name="timer"):
     @commands.check(cmd_channel_check)
     async def add(self, ctx, *, input_text: str):
         """Add a new timer
-        Format: !add YYYY-MM-DD HH:MM:SS system - structure [tags]
-        or: !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
-        or: !add structure_name\ndistance\nReinforced until YYYY.MM.DD HH:MM:SS [tags]"""
+
+Format: 
+!add YYYY-MM-DD HH:MM:SS system - structure [tags]
+or
+!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+or
+!add <copy text from selected item> [alliance ticker][structure type][timer type]
+
+Example:
+!add 4M-QXK - PRIVATE MATSUNOMI P4M3
+38.4 AU
+Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+
+Note: Medium structures should use "HULL" since there is only one timer."""
         try:
             # Look for the new format first (structure name on first line, distance on second, reinforced/anchoring on third)
             lines = input_text.split('\n')
