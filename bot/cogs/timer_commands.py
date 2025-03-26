@@ -267,16 +267,23 @@ Note: Medium structures should use "HULL" since there is only one timer."""
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Monitor citadel-attacked channel for armor loss messages"""
+        """Monitor citadel channels for structure messages"""
         try:
-            # Check if this is the citadel-attacked channel
-            if message.channel.name != 'citadel-attacked':
+            # Check if this is one of our monitored channels
+            if message.channel.id not in [CONFIG['channels']['citadel'], CONFIG['channels']['citadel_info']]:
                 return
-                
-            # Check if this is an armor loss message
-            if not message.content.startswith('Structure lost armor'):
-                return
-                
+
+            if message.channel.id == CONFIG['channels']['citadel'] and message.content.startswith('Structure lost armor'):
+                await self.handle_armor_loss(message)
+            elif message.channel.id == CONFIG['channels']['citadel_info'] and message.content.startswith('Structure full power'):
+                await self.handle_structure_repair(message)
+
+        except Exception as e:
+            logger.error(f"Error processing structure message: {e}")
+
+    async def handle_armor_loss(self, message):
+        """Handle armor loss messages and add timers"""
+        try:
             logger.info("Processing armor loss message")
             
             # Extract structure info and timer from the message
@@ -297,11 +304,9 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             # For Ansiblex gates, keep the full name and add proper tags
             if 'Ansiblex' in structure_type:
                 structure_name = structure_type.replace('The Ansiblex Jump Gate ', '')
-                # Create description with system, structure name, and standard tags
                 description = f"{system} - {structure_name} [NC][Ansiblex][HULL]"
             else:
                 structure_name = structure_type
-                # Create description with system, structure name, and standard hull tag
                 description = f"{system} - {structure_name} [NC][HULL]"
             
             # Parse the time
@@ -330,4 +335,55 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             logger.info(f"Successfully added timer from armor loss message: {system} - {structure_name}")
             
         except Exception as e:
-            logger.error(f"Error processing armor loss message: {e}") 
+            logger.error(f"Error processing armor loss message: {e}")
+
+    async def handle_structure_repair(self, message):
+        """Handle structure repair messages and remove NC Ansiblex timers"""
+        try:
+            logger.info("Processing structure repair message")
+            
+            # Extract structure info from the message
+            match = re.search(
+                r'The (.*?) in ([A-Z0-9-]+)',
+                message.content
+            )
+            
+            if not match:
+                logger.warning(f"Could not parse repair message: {message.content}")
+                return
+                
+            structure_type = match.group(1)
+            system = match.group(2)
+            
+            # Only process Ansiblex repairs
+            if 'Ansiblex' not in structure_type:
+                return
+                
+            structure_name = structure_type.replace('The Ansiblex Jump Gate ', '')
+            
+            # Find and remove matching NC Ansiblex timer
+            removed = False
+            for timer in self.timerboard.timers[:]:  # Create a copy of the list to modify it
+                if (timer.system == system and 
+                    '[NC]' in timer.description and  # Only remove NC tagged timers
+                    '[Ansiblex]' in timer.description and 
+                    structure_name in timer.description):
+                    self.timerboard.timers.remove(timer)
+                    removed = True
+                    logger.info(f"Removed repaired NC Ansiblex timer: {timer.system} - {timer.structure_name}")
+                    
+                    # Send confirmation to commands channel
+                    cmd_channel = self.bot.get_channel(CONFIG['channels']['commands'])
+                    if cmd_channel:
+                        await cmd_channel.send(
+                            f"✅ Removed timer for repaired NC Ansiblex: {system} - {structure_name} (ID: {timer.timer_id})"
+                        )
+            
+            if removed:
+                # Update timerboard
+                self.timerboard.save_data()
+                timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
+                await self.timerboard.update_timerboard(timerboard_channel)
+            
+        except Exception as e:
+            logger.error(f"Error processing repair message: {e}") 
