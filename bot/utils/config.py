@@ -7,12 +7,35 @@ CONFIG_FILE = "/opt/timerbot/bot/config.yaml"
 
 def load_config():
     """Load configuration from config.yaml, checking both /opt/timerbot/bot/ and local directory"""
+    default_config = {
+        'check_interval': 60,
+        'notification_time': 60,
+        'expiry_time': 60,
+        'channels': {
+            'timerboard': None,
+            'commands': None,
+            'citadel': None,
+            'citadel_info': None
+        }
+    }
+    
     try:
         # First try the /opt/timerbot/bot/ location
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
                 config = yaml.safe_load(f)
                 logger.info(f"Loaded configuration from {CONFIG_FILE}")
+                
+                # Ensure all required keys exist
+                if 'channels' not in config:
+                    config['channels'] = {}
+                
+                # Add any missing channel IDs with None as default
+                for channel in default_config['channels']:
+                    if channel not in config['channels']:
+                        config['channels'][channel] = None
+                        logger.warning(f"Channel '{channel}' not found in config, setting to None")
+                
                 return config
                 
         # If not found, try local directory
@@ -21,32 +44,27 @@ def load_config():
             with open(local_config, 'r') as f:
                 config = yaml.safe_load(f)
                 logger.info(f"Loaded configuration from {local_config}")
+                
+                # Same channel validation as above
+                if 'channels' not in config:
+                    config['channels'] = {}
+                
+                for channel in default_config['channels']:
+                    if channel not in config['channels']:
+                        config['channels'][channel] = None
+                        logger.warning(f"Channel '{channel}' not found in config, setting to None")
+                
                 return config
                 
         # If neither exists, use defaults
         logger.error("No config.yaml found in either /opt/timerbot/bot/ or local directory")
         logger.info("Using default configuration")
-        return {
-            'check_interval': 60,
-            'notification_time': 60,
-            'expiry_time': 60,
-            'channels': {
-                'timerboard': None,
-                'commands': None
-            }
-        }
+        return default_config
+        
     except Exception as e:
         logger.error(f"Error loading config.yaml: {e}")
         logger.info("Using default configuration")
-        return {
-            'check_interval': 60,
-            'notification_time': 60,
-            'expiry_time': 60,
-            'channels': {
-                'timerboard': None,
-                'commands': None
-            }
-        }
+        return default_config
 
 def load_token():
     """Load Discord token from .env file"""
