@@ -141,6 +141,9 @@ async def check_channel_access(bot, channel_id, channel_name, required_send=Fals
 async def on_ready():
     logger.info(f"Bot connected as {bot.user}")
     
+    # Wait a moment for the bot to fully connect
+    await asyncio.sleep(2)
+    
     # Sync commands after bot is ready
     try:
         synced = await bot.tree.sync()
@@ -153,33 +156,34 @@ async def on_ready():
     
     # Define channels to check with their requirements
     channels_to_check = {
-        'timerboard': (CONFIG['channels']['timerboard'], True),  # Needs send permission
-        'commands': (CONFIG['channels']['commands'], True),      # Needs send permission
-        'citadel': (CONFIG['channels']['citadel'], False),      # Only needs read
-        'citadel_info': (CONFIG['channels']['citadel_info'], False)  # Only needs read
+        'timerboard': (CONFIG['channels']['timerboard'], True),
+        'commands': (CONFIG['channels']['commands'], True),
+        'citadel': (CONFIG['channels']['citadel'], False),
+        'citadel_info': (CONFIG['channels']['citadel_info'], False)
     }
     
     # Check all channels asynchronously
     logger.info("Starting channel access checks...")
-    channel_checks = [
-        check_channel_access(bot, channel_id, channel_name, required_send)
-        for channel_name, (channel_id, required_send) in channels_to_check.items()
-    ]
-    
-    # Wait for all checks with timeout
     try:
-        # Add 15 second timeout for the entire gather operation
-        results = await asyncio.wait_for(asyncio.gather(*channel_checks), timeout=15)
-        if not all(results):
-            logger.error("❌ Failed to access one or more required channels!")
-            # Continue anyway since we want the bot to run even with partial access
-        else:
-            logger.info("✅ Successfully verified access to all channels")
-    except asyncio.TimeoutError:
-        logger.error("❌ Timed out waiting for channel access!")
-        # Continue anyway to allow partial functionality
+        for channel_name, (channel_id, required_send) in channels_to_check.items():
+            channel = bot.get_channel(channel_id)
+            if not channel:
+                logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id})")
+                continue
+                
+            logger.info(f"Found {channel_name} channel: #{channel.name}")
+            perms = channel.permissions_for(channel.guild.me)
+            logger.info(f"Permissions for #{channel.name}:")
+            logger.info(f"  Can send messages: {perms.send_messages}")
+            logger.info(f"  Can read messages: {perms.read_messages}")
+            
+            if not perms.read_messages:
+                logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
+            if required_send and not perms.send_messages:
+                logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
+    
     except Exception as e:
-        logger.error(f"❌ Error checking channel access: {e}")
+        logger.error(f"Error checking channels: {e}")
     
     logger.info("Channel checks completed, starting bot services...")
     
@@ -190,6 +194,8 @@ async def on_ready():
     timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
     if timerboard_channel:
         await timerboard.update_timerboard(timerboard_channel)
+    else:
+        logger.error("❌ Could not update timerboard - channel not found")
 
 @bot.event
 async def on_command_error(ctx, error):
