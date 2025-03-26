@@ -160,6 +160,7 @@ async def on_ready():
     }
     
     # Check all channels asynchronously
+    logger.info("Starting channel access checks...")
     channel_checks = [
         check_channel_access(bot, channel_id, channel_name, required_send)
         for channel_name, (channel_id, required_send) in channels_to_check.items()
@@ -167,13 +168,20 @@ async def on_ready():
     
     # Wait for all checks with timeout
     try:
-        results = await asyncio.gather(*channel_checks)
+        # Add 15 second timeout for the entire gather operation
+        results = await asyncio.wait_for(asyncio.gather(*channel_checks), timeout=15)
         if not all(results):
             logger.error("❌ Failed to access one or more required channels!")
-            return  # Could optionally exit here if channels are required
+            # Continue anyway since we want the bot to run even with partial access
+        else:
+            logger.info("✅ Successfully verified access to all channels")
     except asyncio.TimeoutError:
         logger.error("❌ Timed out waiting for channel access!")
-        return
+        # Continue anyway to allow partial functionality
+    except Exception as e:
+        logger.error(f"❌ Error checking channel access: {e}")
+    
+    logger.info("Channel checks completed, starting bot services...")
     
     # Start timer check loop
     bot.loop.create_task(check_timers())
