@@ -14,7 +14,7 @@ def load_config():
         'channels': {
             'timerboard': None,
             'commands': None,
-            'citadel': None,
+            'citadel_attacked': None,
             'citadel_info': None
         }
     }

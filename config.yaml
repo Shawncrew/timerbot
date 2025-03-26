@@ -5,7 +5,7 @@ channels:
 
  timerboard: 1346620736055410750  # Channel where timer list is displayed
  commands: 1346620859988574351    # Channel where commands are accepted
- citadel: 1092818946895384576     # Channel for citadel attack notifications
+ citadel_attacked: 1092818946895384576  # Channel for citadel attack notifications
  citadel_info: 1092818260937953330  # Channel for citadel status updates
 
 # Timer Settings

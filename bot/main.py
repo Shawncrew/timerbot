@@ -159,7 +159,7 @@ async def on_ready():
         channels_to_check = {
             'timerboard': (CONFIG['channels']['timerboard'], True),
             'commands': (CONFIG['channels']['commands'], True),
-            'citadel': (CONFIG['channels']['citadel'], False),
+            'citadel_attacked': (CONFIG['channels']['citadel_attacked'], False),
             'citadel_info': (CONFIG['channels']['citadel_info'], False)
         }
         
@@ -170,7 +170,7 @@ async def on_ready():
                 logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id})")
                 continue
                 
-            logger.info(f"Found {channel_name} channel: #{channel.name}")
+            logger.info(f"Found {channel_name} channel: #{channel.name} (ID: {channel_id})")
             perms = channel.permissions_for(channel.guild.me)
             logger.info(f"Permissions for #{channel.name}:")
             logger.info(f"  Can send messages: {perms.send_messages}")
