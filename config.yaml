@@ -1,18 +1,15 @@
 # Discord Channel IDs
 channels:
- # timerboard: 1346598996830851072  # Channel where timer list is displayed #Test Bot
- # commands: 1346599034990891121    # Channel where commands are accepted # Test Bot
-
- timerboard: 1346620736055410750  # Channel where timer list is displayed
- commands: 1346620859988574351    # Channel where commands are accepted
- citadel_attacked: 1092818946895384576  # Channel for citadel attack notifications
- citadel_info: 1092818260937953330  # Channel for citadel status updates
+  timerboard: 1346620736055410750  # Channel where timer list is displayed
+  commands: 1346620859988574351    # Channel where commands are accepted
+  citadel_attacked: 1092818946895384576  # Channel for citadel attack notifications
+  citadel_info: 1092818260937953330  # Channel for citadel status updates
 
 # Timer Settings
 timezone: 'UTC'                    # Timezone for all timer operations
 check_interval: 60                 # How often to check timers (seconds)
 notification_time: 60              # When to notify before timer (minutes)
-expiry_time: 60                  # How long to keep expired timers (minutes)
+expiry_time: 60                   # How long to keep expired timers (minutes)
 
 # Bot Settings
-command_prefix: '!'               # Prefix for bot commands 
+command_prefix: '!'                # Prefix for bot commands 

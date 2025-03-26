@@ -145,20 +145,24 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
+            # Update timerboard
+            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
+            if timerboard_channel:
+                await self.timerboard.update_timerboard(timerboard_channel)
+                
+            # Send confirmation
             if similar_timers:
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
-                await ctx.send(f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
-                             f"Added anyway with ID {new_timer.timer_id}")
+                await ctx.send(
+                    f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
+                    f"Added anyway with ID {new_timer.timer_id}"
+                )
             else:
-                await ctx.send(f"Timer added with ID {new_timer.timer_id}")
-            
-            # Update timerboard channel
-            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
-            await self.timerboard.update_timerboard(timerboard_channel)
-            
+                await ctx.send(f"✅ Timer added with ID {new_timer.timer_id}")
+                
         except Exception as e:
             logger.error(f"Error adding timer: {e}")
-            await ctx.send(f"Error adding timer: {e}")
+            await ctx.send(f"Error adding timer: {str(e)}")
 
     @commands.command()
     @commands.check(cmd_channel_check)

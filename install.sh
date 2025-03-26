@@ -6,8 +6,10 @@ sudo useradd -r -s /bin/false timerbot
 # Create directory structure
 sudo mkdir -p /opt/timerbot/{bot,logs,data,venv}
 
-# Copy files
-sudo cp bot.py config.yaml requirements.txt /opt/timerbot/bot/
+# Copy bot files
+sudo cp -r bot/* /opt/timerbot/bot/
+sudo cp config.yaml /opt/timerbot/bot/
+sudo cp requirements.txt /opt/timerbot/bot/
 
 # Set up virtual environment
 sudo python3 -m venv /opt/timerbot/venv
@@ -15,10 +17,9 @@ sudo /opt/timerbot/venv/bin/pip install -r /opt/timerbot/bot/requirements.txt
 
 # Set permissions
 sudo chown -R timerbot:timerbot /opt/timerbot
-sudo chmod 755 /opt/timerbot
-sudo chmod 640 /opt/timerbot/bot/config.yaml
+sudo chmod -R 755 /opt/timerbot
 
-# Set up service
+# Install systemd service
 sudo cp timerbot.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable timerbot
