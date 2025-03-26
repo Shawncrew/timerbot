@@ -4,7 +4,8 @@ channels:
  # commands: 1346599034990891121    # Channel where commands are accepted # Test Bot
 
  timerboard: 1346620736055410750  # Channel where timer list is displayed
- commands: 1346620859988574351    # Channel where commands are accepted 
+ commands: 1346620859988574351    # Channel where commands are accepted
+ citadel: 1092818946895384576     # Channel for citadel attack notifications (replace with actual ID)
 
 # Timer Settings
 timezone: 'UTC'                    # Timezone for all timer operations

@@ -263,4 +263,71 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             await interaction.response.send_message(
                 f"❌ Error adding timer: {str(e)}", 
                 ephemeral=True
-            ) 
+            )
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Monitor citadel-attacked channel for armor loss messages"""
+        try:
+            # Check if this is the citadel-attacked channel
+            if message.channel.name != 'citadel-attacked':
+                return
+                
+            # Check if this is an armor loss message
+            if not message.content.startswith('Structure lost armor'):
+                return
+                
+            logger.info("Processing armor loss message")
+            
+            # Extract structure info and timer from the message
+            match = re.search(
+                r'The (.*?) in ([A-Z0-9-]+) \((.*?)\).*?timer end at: (\d{4}-\d{2}-\d{2} \d{2}:\d{2})',
+                message.content
+            )
+            
+            if not match:
+                logger.warning(f"Could not parse armor loss message: {message.content}")
+                return
+                
+            structure_type = match.group(1)
+            system = match.group(2)
+            region = match.group(3)
+            time_str = match.group(4)
+            
+            # For Ansiblex gates, keep the full name and add proper tags
+            if 'Ansiblex' in structure_type:
+                structure_name = structure_type.replace('The Ansiblex Jump Gate ', '')
+                # Create description with system, structure name, and standard tags
+                description = f"{system} - {structure_name} [NC][Ansiblex][HULL]"
+            else:
+                structure_name = structure_type
+                # Create description with system, structure name, and standard hull tag
+                description = f"{system} - {structure_name} [NC][HULL]"
+            
+            # Parse the time
+            time = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M')
+            time = EVE_TZ.localize(time)
+            
+            # Add the timer
+            new_timer, similar_timers = await self.timerboard.add_timer(time, description)
+            
+            # Send confirmation to commands channel
+            cmd_channel = self.bot.get_channel(CONFIG['channels']['commands'])
+            if cmd_channel:
+                if similar_timers:
+                    similar_list = "\n".join([t.to_string() for t in similar_timers])
+                    await cmd_channel.send(
+                        f"⚠️ Auto-added timer from armor loss (with similar timers):\n{similar_list}\n"
+                        f"Added anyway with ID {new_timer.timer_id}"
+                    )
+                else:
+                    await cmd_channel.send(f"✅ Auto-added timer from armor loss with ID {new_timer.timer_id}")
+                    
+            # Update timerboard
+            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
+            await self.timerboard.update_timerboard(timerboard_channel)
+            
+            logger.info(f"Successfully added timer from armor loss message: {system} - {structure_name}")
+            
+        except Exception as e:
+            logger.error(f"Error processing armor loss message: {e}") 
