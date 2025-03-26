@@ -23,20 +23,26 @@ def load_config():
         # First try the /opt/timerbot/bot/ location
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
-                config = yaml.safe_load(f)
-                logger.info(f"Loaded configuration from {CONFIG_FILE}")
+                loaded_config = yaml.safe_load(f)
+                logger.info(f"Raw loaded config: {loaded_config}")  # Debug line
                 
                 # Ensure all required keys exist
-                if 'channels' not in config:
-                    config['channels'] = {}
+                if 'channels' not in loaded_config:
+                    logger.error("No 'channels' section found in config")
+                    loaded_config['channels'] = {}
+                
+                # Log the channels section specifically
+                logger.info(f"Channels section: {loaded_config.get('channels', {})}")  # Debug line
                 
                 # Add any missing channel IDs with None as default
                 for channel in default_config['channels']:
-                    if channel not in config['channels']:
-                        config['channels'][channel] = None
+                    if channel not in loaded_config['channels']:
+                        loaded_config['channels'][channel] = None
                         logger.warning(f"Channel '{channel}' not found in config, setting to None")
+                    else:
+                        logger.info(f"Found channel '{channel}' with ID: {loaded_config['channels'][channel]}")  # Debug line
                 
-                return config
+                return loaded_config
                 
         # If not found, try local directory
         local_config = "config.yaml"
