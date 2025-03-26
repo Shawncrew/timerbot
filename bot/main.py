@@ -139,32 +139,31 @@ async def check_channel_access(bot, channel_id, channel_name, required_send=Fals
 
 @bot.event
 async def on_ready():
-    logger.info(f"Bot connected as {bot.user}")
-    
-    # Wait a moment for the bot to fully connect
-    await asyncio.sleep(2)
-    
-    # Sync commands after bot is ready
     try:
-        synced = await bot.tree.sync()
-        logger.info(f"Synced {len(synced)} commands")
-    except Exception as e:
-        logger.error(f"Error syncing commands: {e}")
-    
-    # Debug channel information
-    logger.info("Checking channels:")
-    
-    # Define channels to check with their requirements
-    channels_to_check = {
-        'timerboard': (CONFIG['channels']['timerboard'], True),
-        'commands': (CONFIG['channels']['commands'], True),
-        'citadel': (CONFIG['channels']['citadel'], False),
-        'citadel_info': (CONFIG['channels']['citadel_info'], False)
-    }
-    
-    # Check all channels asynchronously
-    logger.info("Starting channel access checks...")
-    try:
+        logger.info(f"Bot connected as {bot.user}")
+        
+        # Wait a moment for the bot to fully connect
+        await asyncio.sleep(2)
+        
+        # Sync commands after bot is ready
+        try:
+            synced = await bot.tree.sync()
+            logger.info(f"Synced {len(synced)} commands")
+        except Exception as e:
+            logger.error(f"Error syncing commands: {e}")
+        
+        # Debug channel information
+        logger.info("Checking channels...")
+        
+        # Define channels to check with their requirements
+        channels_to_check = {
+            'timerboard': (CONFIG['channels']['timerboard'], True),
+            'commands': (CONFIG['channels']['commands'], True),
+            'citadel': (CONFIG['channels']['citadel'], False),
+            'citadel_info': (CONFIG['channels']['citadel_info'], False)
+        }
+        
+        # Check all channels
         for channel_name, (channel_id, required_send) in channels_to_check.items():
             channel = bot.get_channel(channel_id)
             if not channel:
@@ -181,21 +180,23 @@ async def on_ready():
                 logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
             if required_send and not perms.send_messages:
                 logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
-    
+        
+        logger.info("Channel checks completed, starting bot services...")
+        
+        # Start timer check loop
+        bot.loop.create_task(check_timers())
+        
+        # Update the timerboard display
+        timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
+        if timerboard_channel:
+            await timerboard.update_timerboard(timerboard_channel)
+            logger.info("Updated timerboard display")
+        else:
+            logger.error("❌ Could not update timerboard - channel not found")
+            
     except Exception as e:
-        logger.error(f"Error checking channels: {e}")
-    
-    logger.info("Channel checks completed, starting bot services...")
-    
-    # Start timer check loop
-    bot.loop.create_task(check_timers())
-    
-    # Update the timerboard display
-    timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
-    if timerboard_channel:
-        await timerboard.update_timerboard(timerboard_channel)
-    else:
-        logger.error("❌ Could not update timerboard - channel not found")
+        logger.error(f"Error in on_ready: {e}")
+        logger.exception("Full traceback:")
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -209,9 +210,25 @@ async def on_command_error(ctx, error):
         await ctx.send(f"Error executing command: {error}")
 
 async def setup():
-    cog = TimerCommands(bot, timerboard)
-    await bot.add_cog(cog)
+    """Initialize bot and cogs"""
+    try:
+        logger.info("Initializing bot cogs...")
+        cog = TimerCommands(bot, timerboard)
+        await bot.add_cog(cog)
+        logger.info("Successfully initialized cogs")
+    except Exception as e:
+        logger.error(f"Error initializing cogs: {e}")
+
+def run_bot():
+    """Run the bot"""
+    try:
+        # Set up the bot first
+        asyncio.run(setup())
+        logger.info("Starting bot...")
+        # Then run it
+        bot.run(TOKEN, log_handler=None)  # Disable discord.py's default logging
+    except Exception as e:
+        logger.error(f"Error running bot: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(setup())
-    bot.run(TOKEN) 
+    run_bot() 
