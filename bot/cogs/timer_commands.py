@@ -56,24 +56,35 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                 structure_name = lines[0].strip()
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
-                # Extract system from structure name
-                system_match = re.match(r'([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
+                # Extract system from structure name - handle special formats
+                system_match = re.match(r'(?:.*?\(([A-Z0-9-]+)[^\)]*\))|([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
                 if system_match:
-                    system = system_match.group(1).strip()
+                    # Get system from either the parentheses group or the direct match
+                    system = (system_match.group(1) or system_match.group(2)).strip()
                     
                     # Check if this is an Ansiblex (has » character or [Ansiblex] tag)
                     is_ansiblex = '»' in structure_name or '[Ansiblex]' in lines[2]
+                    # Check if this is a Skyhook (has "Orbital Skyhook" in name)
+                    is_skyhook = 'Orbital Skyhook' in structure_name
                     
                     if is_ansiblex:
                         # For Ansiblex, keep the full structure name including the system
                         structure_name = structure_name.strip()
+                    elif is_skyhook:
+                        # For Skyhook, format as "Orbital Skyhook Planet X"
+                        planet_match = re.search(r'\(.*?\s+([IVX]+)\)', structure_name)
+                        if planet_match:
+                            planet_num = planet_match.group(1)
+                            structure_name = f"Orbital Skyhook Planet {planet_num}"
+                        else:
+                            structure_name = "Orbital Skyhook"
                     else:
-                        # For non-Ansiblex, remove the system name and dash
+                        # For other structures, remove the system name and dash
                         structure_name = structure_name[len(system):].strip()
                         if structure_name.startswith('-'):
                             structure_name = structure_name[1:].strip()
                             
-                    logger.debug(f"Parsed system: {system}, structure: {structure_name}, is_ansiblex: {is_ansiblex}")
+                    logger.debug(f"Parsed system: {system}, structure: {structure_name}, is_ansiblex: {is_ansiblex}, is_skyhook: {is_skyhook}")
                 else:
                     await ctx.send("Could not parse system name from structure")
                     return
