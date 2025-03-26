@@ -120,29 +120,36 @@ async def on_ready():
     
     # Debug channel information
     logger.info("Checking channels:")
-    logger.info(f"Timerboard channel: {CONFIG['channels']['timerboard']}")
-    logger.info(f"Commands channel: {CONFIG['channels']['commands']}")
     
-    timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
-    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
+    # Define channels to check
+    channels_to_check = {
+        'timerboard': CONFIG['channels']['timerboard'],
+        'commands': CONFIG['channels']['commands'],
+        'citadel': CONFIG['channels']['citadel'],
+        'citadel_info': CONFIG['channels']['citadel_info']
+    }
     
-    if timerboard_channel:
-        logger.info(f"Found Timerboard channel: #{timerboard_channel.name}")
-        logger.info(f"Can send messages: {timerboard_channel.permissions_for(timerboard_channel.guild.me).send_messages}")
-    else:
-        logger.error("Could not find Timerboard channel!")
-        
-    if cmd_channel:
-        logger.info(f"Found Commands channel: #{cmd_channel.name}")
-        logger.info(f"Can send messages: {cmd_channel.permissions_for(cmd_channel.guild.me).send_messages}")
-        logger.info(f"Can read messages: {cmd_channel.permissions_for(cmd_channel.guild.me).read_messages}")
-    else:
-        logger.error("Could not find Commands channel!")
+    for channel_name, channel_id in channels_to_check.items():
+        channel = bot.get_channel(channel_id)
+        if channel:
+            logger.info(f"Found {channel_name} channel: #{channel.name}")
+            perms = channel.permissions_for(channel.guild.me)
+            logger.info(f"Permissions for #{channel.name}:")
+            logger.info(f"  Can send messages: {perms.send_messages}")
+            logger.info(f"  Can read messages: {perms.read_messages}")
+            
+            if not perms.read_messages:
+                logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
+            if not perms.send_messages and channel_name in ['timerboard', 'commands']:
+                logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
+        else:
+            logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id})!")
     
     # Start timer check loop
     bot.loop.create_task(check_timers())
     
     # Update the timerboard display
+    timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
     if timerboard_channel:
         await timerboard.update_timerboard(timerboard_channel)
 
