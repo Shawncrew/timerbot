@@ -107,6 +107,36 @@ async def check_timers():
             logger.error(f"Error in timer check loop: {e}")
             await asyncio.sleep(CONFIG['check_interval'])
 
+async def check_channel_access(bot, channel_id, channel_name, required_send=False):
+    """Check if a channel can be accessed with timeout"""
+    try:
+        # Wait for channel to become available with 10 second timeout
+        for _ in range(10):
+            channel = bot.get_channel(channel_id)
+            if channel:
+                logger.info(f"Found {channel_name} channel: #{channel.name}")
+                perms = channel.permissions_for(channel.guild.me)
+                logger.info(f"Permissions for #{channel.name}:")
+                logger.info(f"  Can send messages: {perms.send_messages}")
+                logger.info(f"  Can read messages: {perms.read_messages}")
+                
+                if not perms.read_messages:
+                    logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
+                    return False
+                if required_send and not perms.send_messages:
+                    logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
+                    return False
+                return True
+            
+            await asyncio.sleep(1)
+            
+        logger.error(f"❌ Timed out waiting for {channel_name} channel (ID: {channel_id})!")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error checking {channel_name} channel: {e}")
+        return False
+
 @bot.event
 async def on_ready():
     logger.info(f"Bot connected as {bot.user}")
@@ -121,29 +151,29 @@ async def on_ready():
     # Debug channel information
     logger.info("Checking channels:")
     
-    # Define channels to check
+    # Define channels to check with their requirements
     channels_to_check = {
-        'timerboard': CONFIG['channels']['timerboard'],
-        'commands': CONFIG['channels']['commands'],
-        'citadel': CONFIG['channels']['citadel'],
-        'citadel_info': CONFIG['channels']['citadel_info']
+        'timerboard': (CONFIG['channels']['timerboard'], True),  # Needs send permission
+        'commands': (CONFIG['channels']['commands'], True),      # Needs send permission
+        'citadel': (CONFIG['channels']['citadel'], False),      # Only needs read
+        'citadel_info': (CONFIG['channels']['citadel_info'], False)  # Only needs read
     }
     
-    for channel_name, channel_id in channels_to_check.items():
-        channel = bot.get_channel(channel_id)
-        if channel:
-            logger.info(f"Found {channel_name} channel: #{channel.name}")
-            perms = channel.permissions_for(channel.guild.me)
-            logger.info(f"Permissions for #{channel.name}:")
-            logger.info(f"  Can send messages: {perms.send_messages}")
-            logger.info(f"  Can read messages: {perms.read_messages}")
-            
-            if not perms.read_messages:
-                logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
-            if not perms.send_messages and channel_name in ['timerboard', 'commands']:
-                logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
-        else:
-            logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id})!")
+    # Check all channels asynchronously
+    channel_checks = [
+        check_channel_access(bot, channel_id, channel_name, required_send)
+        for channel_name, (channel_id, required_send) in channels_to_check.items()
+    ]
+    
+    # Wait for all checks with timeout
+    try:
+        results = await asyncio.gather(*channel_checks)
+        if not all(results):
+            logger.error("❌ Failed to access one or more required channels!")
+            return  # Could optionally exit here if channels are required
+    except asyncio.TimeoutError:
+        logger.error("❌ Timed out waiting for channel access!")
+        return
     
     # Start timer check loop
     bot.loop.create_task(check_timers())
