@@ -244,7 +244,10 @@ class TimerBoard:
         existing_messages.reverse()
 
         messages_to_update = []
-        current_message = ""
+        
+        # Add current time as first line
+        current_time = datetime.datetime.now(EVE_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        current_message = f"Current Time: `{current_time}`\n\n"
 
         if self.timers:
             for timer in self.timers:
@@ -255,7 +258,7 @@ class TimerBoard:
                 # Include notes only if they exist
                 notes_str = f" {timer.notes}" if timer.notes else ""
                 timer_line = (
-                    f"`{time_str}` "  # Only timestamp in code block
+                    f"`{time_str}` "
                     f"{system_link} ({timer.region}) - "
                     f"{timer.structure_name}{notes_str} "
                     f"({timer.timer_id})\n"
@@ -281,7 +284,7 @@ class TimerBoard:
             for message in existing_messages[len(messages_to_update):]:
                 await message.delete()
         else:
-            content = "No active timers."
+            content = f"Current Time: `{current_time}`\n\nNo active timers."
             if existing_messages:
                 await existing_messages[0].edit(content=content)
                 for message in existing_messages[1:]:
