@@ -48,6 +48,11 @@ async def check_timers():
             now = datetime.datetime.now(EVE_TZ)
             logger.debug(f"Checking timers at {now}")
             
+            # Update timerboard to refresh current time
+            timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
+            if timerboard_channel:
+                await timerboard.update_timerboard(timerboard_channel)
+            
             # Get all timers that are within the next hour
             upcoming_timers = [
                 timer for timer in timerboard.timers 

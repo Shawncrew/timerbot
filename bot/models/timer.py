@@ -245,13 +245,14 @@ class TimerBoard:
 
         messages_to_update = []
         
-        # Add current time as first line
-        current_time = datetime.datetime.now(EVE_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        # Add current time as first line, set seconds to 00
+        now = datetime.datetime.now(EVE_TZ)
+        current_time = now.replace(second=0).strftime('%Y-%m-%d %H:%M:00')
         current_message = f"Current Time: `{current_time}`\n\n"
 
         if self.timers:
             for timer in self.timers:
-                time_str = timer.time.strftime('%Y-%m-%d %H:%M:%S')
+                time_str = timer.time.strftime('%Y-%m-%d %H:%M:%S')  # Keep full seconds for timers
                 clean_system = clean_system_name(timer.system)
                 system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                 
