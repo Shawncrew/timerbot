@@ -6,16 +6,24 @@ from .logger import logger
 CONFIG_FILE = "/opt/timerbot/bot/config.yaml"
 
 def load_config():
-    """Load configuration from config.yaml, checking both /opt/timerbot/bot/ and local directory"""
+    """Load configuration from config.yaml"""
     default_config = {
         'check_interval': 60,
         'notification_time': 60,
         'expiry_time': 60,
-        'channels': {
-            'timerboard': None,
-            'commands': None,
-            'citadel_attacked': None,
-            'citadel_info': None
+        'servers': {
+            'server1': {
+                'timerboard': None,
+                'commands': None,
+                'citadel_attacked': None,
+                'citadel_info': None
+            },
+            'server2': {
+                'timerboard': None,
+                'commands': None,
+                'citadel_attacked': None,
+                'citadel_info': None
+            }
         }
     }
     
@@ -24,23 +32,29 @@ def load_config():
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
                 loaded_config = yaml.safe_load(f)
-                logger.info(f"Raw loaded config: {loaded_config}")  # Debug line
+                logger.info(f"Raw loaded config: {loaded_config}")
                 
-                # Ensure all required keys exist
-                if 'channels' not in loaded_config:
-                    logger.error("No 'channels' section found in config")
-                    loaded_config['channels'] = {}
+                # Ensure servers section exists
+                if 'servers' not in loaded_config:
+                    logger.error("No 'servers' section found in config")
+                    loaded_config['servers'] = {}
                 
-                # Log the channels section specifically
-                logger.info(f"Channels section: {loaded_config.get('channels', {})}")  # Debug line
+                # Log the servers section
+                logger.info(f"Servers section: {loaded_config.get('servers', {})}")
                 
-                # Add any missing channel IDs with None as default
-                for channel in default_config['channels']:
-                    if channel not in loaded_config['channels']:
-                        loaded_config['channels'][channel] = None
-                        logger.warning(f"Channel '{channel}' not found in config, setting to None")
-                    else:
-                        logger.info(f"Found channel '{channel}' with ID: {loaded_config['channels'][channel]}")  # Debug line
+                # Add any missing server configs
+                for server in default_config['servers']:
+                    if server not in loaded_config['servers']:
+                        loaded_config['servers'][server] = default_config['servers'][server]
+                        logger.warning(f"Server '{server}' not found in config, using defaults")
+                    
+                    # Add any missing channel configs for each server
+                    for channel in default_config['servers']['server1']:
+                        if channel not in loaded_config['servers'][server]:
+                            loaded_config['servers'][server][channel] = None
+                            logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
+                        else:
+                            logger.info(f"Found channel '{channel}' in {server} with ID: {loaded_config['servers'][server][channel]}")
                 
                 return loaded_config
                 
@@ -52,13 +66,18 @@ def load_config():
                 logger.info(f"Loaded configuration from {local_config}")
                 
                 # Same channel validation as above
-                if 'channels' not in config:
-                    config['channels'] = {}
+                if 'servers' not in config:
+                    config['servers'] = {}
                 
-                for channel in default_config['channels']:
-                    if channel not in config['channels']:
-                        config['channels'][channel] = None
-                        logger.warning(f"Channel '{channel}' not found in config, setting to None")
+                for server in default_config['servers']:
+                    if server not in config['servers']:
+                        config['servers'][server] = default_config['servers'][server]
+                        logger.warning(f"Server '{server}' not found in config, using defaults")
+                    
+                    for channel in default_config['servers']['server1']:
+                        if channel not in config['servers'][server]:
+                            config['servers'][server][channel] = None
+                            logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
                 
                 return config
                 

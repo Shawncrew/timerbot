@@ -48,10 +48,18 @@ async def check_timers():
             now = datetime.datetime.now(EVE_TZ)
             logger.debug(f"Checking timers at {now}")
             
-            # Update timerboard to refresh current time
-            timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
-            if timerboard_channel:
-                await timerboard.update_timerboard(timerboard_channel)
+            # Update timerboards in all servers
+            timerboard_channels = [
+                bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+            ]
+            await timerboard.update_timerboard(timerboard_channels)
+            
+            # Get all command channels for notifications
+            cmd_channels = [
+                bot.get_channel(server_config['commands'])
+                for server_config in CONFIG['servers'].values()
+            ]
             
             # Get all timers that are within the next hour
             upcoming_timers = [
@@ -70,31 +78,31 @@ async def check_timers():
                 # Alert at 60 minutes if not already alerted
                 if 59 <= time_until <= 60 and timer.timer_id not in sixty_min_alerted:
                     logger.info(f"Timer {timer.timer_id} is at 60 minute mark")
-                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
-                    if cmd_channel:
-                        await cmd_channel.send(
-                            f"⚠️ Timer in 60 minutes: {timer.system} - {timer.structure_name} at {timer.time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {timer.timer_id})"
-                        )
-                        sixty_min_alerted.add(timer.timer_id)
-                        logger.info(f"Added timer {timer.timer_id} to sixty_min_alerted")
+                    for cmd_channel in cmd_channels:
+                        if cmd_channel:
+                            await cmd_channel.send(
+                                f"⚠️ Timer in 60 minutes: {timer.system} - {timer.structure_name} at {timer.time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {timer.timer_id})"
+                            )
+                            sixty_min_alerted.add(timer.timer_id)
+                            logger.info(f"Added timer {timer.timer_id} to sixty_min_alerted")
                 
                 # Alert at start time if not already alerted
                 elif -1 <= time_until <= 1 and timer.timer_id not in start_time_alerted:
                     logger.info(f"Timer {timer.timer_id} is at start time (time_until={time_until:.1f})")
-                    cmd_channel = bot.get_channel(CONFIG['channels']['commands'])
-                    if cmd_channel:
-                        logger.info(f"Sending start alert to #{cmd_channel.name}")
-                        try:
-                            await cmd_channel.send(
-                                f"🚨 **TIMER STARTING NOW**: {timer.system} - {timer.structure_name} (ID: {timer.timer_id})"
-                            )
-                            logger.info(f"Successfully sent start alert for timer {timer.timer_id}")
-                            start_time_alerted.add(timer.timer_id)
-                            logger.info(f"Added timer {timer.timer_id} to start_time_alerted")
-                        except Exception as e:
-                            logger.error(f"Failed to send start alert: {e}")
-                    else:
-                        logger.error(f"Could not find commands channel (ID: {CONFIG['channels']['commands']})")
+                    for cmd_channel in cmd_channels:
+                        if cmd_channel:
+                            logger.info(f"Sending start alert to #{cmd_channel.name}")
+                            try:
+                                await cmd_channel.send(
+                                    f"🚨 **TIMER STARTING NOW**: {timer.system} - {timer.structure_name} (ID: {timer.timer_id})"
+                                )
+                                logger.info(f"Successfully sent start alert for timer {timer.timer_id}")
+                                start_time_alerted.add(timer.timer_id)
+                                logger.info(f"Added timer {timer.timer_id} to start_time_alerted")
+                            except Exception as e:
+                                logger.error(f"Failed to send start alert: {e}")
+                        else:
+                            logger.error(f"Could not find commands channel (ID: {server_config['commands']})")
             
             # Clean up expired timers from both alert sets
             expired = timerboard.remove_expired()
@@ -102,9 +110,10 @@ async def check_timers():
                 for timer in expired:
                     sixty_min_alerted.discard(timer.timer_id)
                     start_time_alerted.discard(timer.timer_id)
-                timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
-                if timerboard_channel:
-                    await timerboard.update_timerboard(timerboard_channel)
+                for server_config in CONFIG['servers'].values():
+                    timerboard_channel = bot.get_channel(server_config['timerboard'])
+                    if timerboard_channel:
+                        await timerboard.update_timerboard([timerboard_channel])
             
             await asyncio.sleep(CONFIG['check_interval'])
             
@@ -194,7 +203,7 @@ async def on_ready():
         # Update the timerboard display
         timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
         if timerboard_channel:
-            await timerboard.update_timerboard(timerboard_channel)
+            await timerboard.update_timerboard([timerboard_channel])
             logger.info("Updated timerboard display")
         else:
             logger.error("❌ Could not update timerboard - channel not found")

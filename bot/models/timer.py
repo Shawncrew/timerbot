@@ -235,60 +235,68 @@ class TimerBoard:
         
         return expired
 
-    async def update_timerboard(self, channel):
-        """Update the timerboard display in Discord"""
-        existing_messages = []
-        async for message in channel.history(limit=100):
-            if message.author == channel.guild.me:
-                existing_messages.append(message)
-        existing_messages.reverse()
-
-        messages_to_update = []
-        
-        # Add current time as first line, set seconds to 00
-        now = datetime.datetime.now(EVE_TZ)
-        current_time = now.replace(second=0).strftime('%Y-%m-%d %H:%M:00')
-        current_message = f"Current Time: `{current_time}`\n\n"
-
-        if self.timers:
-            for timer in self.timers:
-                time_str = timer.time.strftime('%Y-%m-%d %H:%M:%S')  # Keep full seconds for timers
-                clean_system = clean_system_name(timer.system)
-                system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+    async def update_timerboard(self, channels):
+        """Update the timerboard display in all Discord servers"""
+        for channel in channels:
+            if channel is None:
+                continue
                 
-                # Include notes only if they exist
-                notes_str = f" {timer.notes}" if timer.notes else ""
-                timer_line = (
-                    f"`{time_str}` "
-                    f"{system_link} ({timer.region}) - "
-                    f"{timer.structure_name}{notes_str} "
-                    f"({timer.timer_id})\n"
-                )
+            try:
+                existing_messages = []
+                async for message in channel.history(limit=100):
+                    if message.author == channel.guild.me:
+                        existing_messages.append(message)
+                existing_messages.reverse()
+
+                messages_to_update = []
                 
-                if len(current_message) + len(timer_line) > self.MAX_MESSAGE_LENGTH:
-                    messages_to_update.append(current_message.strip())
-                    current_message = timer_line
+                # Add current time as first line
+                now = datetime.datetime.now(EVE_TZ)
+                current_time = now.replace(second=0).strftime('%Y-%m-%d %H:%M:00')
+                current_message = f"Current Time: `{current_time}`\n\n"
+
+                if self.timers:
+                    for timer in self.timers:
+                        time_str = timer.time.strftime('%Y-%m-%d %H:%M:%S')  # Keep full seconds for timers
+                        clean_system = clean_system_name(timer.system)
+                        system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+                        
+                        # Include notes only if they exist
+                        notes_str = f" {timer.notes}" if timer.notes else ""
+                        timer_line = (
+                            f"`{time_str}` "
+                            f"{system_link} ({timer.region}) - "
+                            f"{timer.structure_name}{notes_str} "
+                            f"({timer.timer_id})\n"
+                        )
+                        
+                        if len(current_message) + len(timer_line) > self.MAX_MESSAGE_LENGTH:
+                            messages_to_update.append(current_message.strip())
+                            current_message = timer_line
+                        else:
+                            current_message += timer_line
+
+                    if current_message:
+                        messages_to_update.append(current_message.strip())
+
+                    # Update or send messages
+                    for i, content in enumerate(messages_to_update):
+                        if i < len(existing_messages):
+                            await existing_messages[i].edit(content=content)
+                        else:
+                            await channel.send(content)
+
+                    # Delete any extra messages
+                    for message in existing_messages[len(messages_to_update):]:
+                        await message.delete()
                 else:
-                    current_message += timer_line
+                    content = f"Current Time: `{current_time}`\n\nNo active timers."
+                    if existing_messages:
+                        await existing_messages[0].edit(content=content)
+                        for message in existing_messages[1:]:
+                            await message.delete()
 
-            if current_message:
-                messages_to_update.append(current_message.strip())
-
-            # Update or send messages
-            for i, content in enumerate(messages_to_update):
-                if i < len(existing_messages):
-                    await existing_messages[i].edit(content=content)
-                else:
-                    await channel.send(content)
-
-            # Delete any extra messages
-            for message in existing_messages[len(messages_to_update):]:
-                await message.delete()
-        else:
-            content = f"Current Time: `{current_time}`\n\nNo active timers."
-            if existing_messages:
-                await existing_messages[0].edit(content=content)
-                for message in existing_messages[1:]:
-                    await message.delete()
-            else:
-                await channel.send(content) 
+                logger.info(f"Updated timerboard in server: {channel.guild.name}")
+                
+            except Exception as e:
+                logger.error(f"Error updating timerboard in {channel.guild.name}: {e}") 
