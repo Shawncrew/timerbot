@@ -28,51 +28,71 @@ def load_config():
     }
     
     try:
-        # First try the /opt/timerbot/bot/ location
+        # Load environment variables first
+        if os.path.exists('/opt/timerbot/bot/.env'):
+            load_dotenv('/opt/timerbot/bot/.env')
+            logger.info("Loading tokens from /opt/timerbot/bot/.env")
+        else:
+            # Try local .env file
+            if os.path.exists('.env'):
+                load_dotenv()
+                logger.info("Loading tokens from local .env file")
+            else:
+                logger.error("No .env file found in either location")
+                raise FileNotFoundError("No .env file found")
+
+        # Load and process config
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
                 loaded_config = yaml.safe_load(f)
-                logger.info(f"Raw loaded config: {loaded_config}")
                 
-                # Handle migration from old 'channels' format to new 'servers' format
-                if 'channels' in loaded_config and 'servers' not in loaded_config:
-                    logger.info("Migrating from old 'channels' format to new 'servers' format")
-                    loaded_config['servers'] = {
-                        'server1': loaded_config['channels'].copy()
-                    }
-                    # Keep server2 as None values
-                    loaded_config['servers']['server2'] = {
-                        'timerboard': None,
-                        'commands': None,
-                        'citadel_attacked': None,
-                        'citadel_info': None
-                    }
-                    # Remove old channels section
-                    del loaded_config['channels']
+            # Replace environment variables in tokens
+            for server in loaded_config['servers'].values():
+                if 'token' in server:
+                    token_var = server['token'].strip('${} ')
+                    server['token'] = os.getenv(token_var)
+                    if not server['token']:
+                        logger.error(f"Token {token_var} not found in environment variables")
                 
-                # Ensure servers section exists
-                if 'servers' not in loaded_config:
-                    logger.error("No 'servers' section found in config")
-                    loaded_config['servers'] = {}
+            # Handle migration from old 'channels' format to new 'servers' format
+            if 'channels' in loaded_config and 'servers' not in loaded_config:
+                logger.info("Migrating from old 'channels' format to new 'servers' format")
+                loaded_config['servers'] = {
+                    'server1': loaded_config['channels'].copy()
+                }
+                # Keep server2 as None values
+                loaded_config['servers']['server2'] = {
+                    'timerboard': None,
+                    'commands': None,
+                    'citadel_attacked': None,
+                    'citadel_info': None
+                }
+                # Remove old channels section
+                del loaded_config['channels']
+            
+            # Ensure servers section exists
+            if 'servers' not in loaded_config:
+                logger.error("No 'servers' section found in config")
+                loaded_config['servers'] = {}
+            
+            # Log the servers section
+            logger.info(f"Servers section: {loaded_config.get('servers', {})}")
+            
+            # Add any missing server configs
+            for server in default_config['servers']:
+                if server not in loaded_config['servers']:
+                    loaded_config['servers'][server] = default_config['servers'][server]
+                    logger.warning(f"Server '{server}' not found in config, using defaults")
                 
-                # Log the servers section
-                logger.info(f"Servers section: {loaded_config.get('servers', {})}")
-                
-                # Add any missing server configs
-                for server in default_config['servers']:
-                    if server not in loaded_config['servers']:
-                        loaded_config['servers'][server] = default_config['servers'][server]
-                        logger.warning(f"Server '{server}' not found in config, using defaults")
-                    
-                    # Add any missing channel configs for each server
-                    for channel in default_config['servers']['server1']:
-                        if channel not in loaded_config['servers'][server]:
-                            loaded_config['servers'][server][channel] = None
-                            logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
-                        else:
-                            logger.info(f"Found channel '{channel}' in {server} with ID: {loaded_config['servers'][server][channel]}")
-                
-                return loaded_config
+                # Add any missing channel configs for each server
+                for channel in default_config['servers']['server1']:
+                    if channel not in loaded_config['servers'][server]:
+                        loaded_config['servers'][server][channel] = None
+                        logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
+                    else:
+                        logger.info(f"Found channel '{channel}' in {server} with ID: {loaded_config['servers'][server][channel]}")
+            
+            return loaded_config
                 
         # If not found, try local directory
         local_config = "config.yaml"
