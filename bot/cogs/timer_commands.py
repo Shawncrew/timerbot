@@ -177,9 +177,14 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             clean_system = clean_system_name(timer.system)
             system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
             await ctx.send(f"Removed timer: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})")
-            # Use CONFIG directly
-            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
-            await self.timerboard.update_timerboard(timerboard_channel)
+            
+            # Update all timerboards
+            timerboard_channels = [
+                self.bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+                if server_config['timerboard'] is not None
+            ]
+            await self.timerboard.update_timerboard(timerboard_channels)
         else:
             logger.warning(f"{ctx.author} attempted to remove non-existent timer {timer_id}")
             await ctx.send(f"No timer found with ID {timer_id}")
@@ -190,25 +195,34 @@ Note: Medium structures should use "HULL" since there is only one timer."""
         """Refresh the timerboard by clearing and recreating all messages"""
         try:
             logger.info(f"{ctx.author} requested timerboard refresh")
-            # Use CONFIG directly
-            channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
             
-            # Delete all bot messages in the channel
-            deleted = 0
-            async for message in channel.history(limit=100):
-                if message.author == self.bot.user:
-                    await message.delete()
-                    deleted += 1
+            # Get all timerboard channels
+            timerboard_channels = [
+                self.bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+                if server_config['timerboard'] is not None
+            ]
             
-            # Recreate the timerboard
-            await self.timerboard.update_timerboard(channel)
+            # Delete all bot messages in each channel
+            total_deleted = 0
+            for channel in timerboard_channels:
+                deleted = 0
+                async for message in channel.history(limit=100):
+                    if message.author == self.bot.user:
+                        await message.delete()
+                        deleted += 1
+                total_deleted += deleted
+                logger.info(f"Deleted {deleted} messages from {channel.name}")
             
-            logger.info(f"Timerboard refreshed - deleted {deleted} messages and recreated display")
-            await ctx.send(f"Timerboard refreshed - deleted {deleted} messages and recreated display")
+            # Recreate the timerboards
+            await self.timerboard.update_timerboard(timerboard_channels)
+            
+            logger.info(f"Timerboards refreshed - deleted {total_deleted} messages and recreated displays")
+            await ctx.send(f"Timerboards refreshed - deleted {total_deleted} messages and recreated displays")
             
         except Exception as e:
-            logger.error(f"Error refreshing timerboard: {e}")
-            await ctx.send(f"Error refreshing timerboard: {e}")
+            logger.error(f"Error refreshing timerboards: {e}")
+            await ctx.send(f"Error refreshing timerboards: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -279,9 +293,13 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     else:
                         await cmd_channel.send(f"✅ Auto-added timer from armor loss with ID {new_timer.timer_id}")
                     
-            # Update timerboard
-            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
-            await self.timerboard.update_timerboard(timerboard_channel)
+            # Update all timerboards
+            timerboard_channels = [
+                self.bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+                if server_config['timerboard'] is not None
+            ]
+            await self.timerboard.update_timerboard(timerboard_channels)
             
             logger.info(f"Successfully added timer from armor loss message: {system} - {structure_name}")
             
