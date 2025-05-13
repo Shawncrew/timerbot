@@ -127,32 +127,5 @@ def load_config():
         logger.info("Using default configuration")
         return default_config
 
-def load_token():
-    """Load Discord token from .env file"""
-    try:
-        # First try /opt/timerbot/bot/.env
-        if os.path.exists('/opt/timerbot/bot/.env'):
-            load_dotenv('/opt/timerbot/bot/.env')
-            logger.info("Loading token from /opt/timerbot/bot/.env")
-        else:
-            # Try local .env file
-            if os.path.exists('.env'):
-                load_dotenv()
-                logger.info("Loading token from local .env file")
-            else:
-                logger.error("No .env file found in either location")
-                raise FileNotFoundError("No .env file found")
-
-        token = os.getenv('DISCORD_TOKEN')
-        if not token:
-            logger.error("DISCORD_TOKEN not found in .env file")
-            raise ValueError("DISCORD_TOKEN not found in .env file")
-            
-        return token
-
-    except Exception as e:
-        logger.error(f"Error loading Discord token: {e}")
-        raise
-
 # Load config at module level
 CONFIG = load_config() 

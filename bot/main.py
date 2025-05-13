@@ -10,7 +10,7 @@ import datetime
 from discord import app_commands
 
 # Use relative imports since we're inside the bot package
-from bot.utils.config import load_config, load_token
+from bot.utils.config import load_config
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands
@@ -25,7 +25,6 @@ logger.info("""
 
 # Load configuration
 CONFIG = load_config()
-TOKEN = load_token()
 
 # Bot setup
 intents = discord.Intents.default()
