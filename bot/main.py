@@ -157,8 +157,9 @@ async def on_ready():
         logger.info(f"Bot connected as {bot.user}")
         logger.info(f"Bot application ID: {bot.user.id}")
         
-        # Debug guild and channel info
+        # Debug guild info
         logger.info("Connected to guilds:")
+        logger.info(f"Total guilds: {len(bot.guilds)}")
         for guild in bot.guilds:
             logger.info(f"  Guild: {guild.name} (ID: {guild.id})")
             logger.info(f"  Is bot connected: {guild.me and guild.me.status}")
