@@ -156,6 +156,14 @@ async def on_ready():
     try:
         logger.info(f"Bot connected as {bot.user}")
         
+        # Debug guild and channel info
+        logger.info("Connected to guilds:")
+        for guild in bot.guilds:
+            logger.info(f"  Guild: {guild.name} (ID: {guild.id})")
+            logger.info("  Channels:")
+            for channel in guild.channels:
+                logger.info(f"    - #{channel.name} (ID: {channel.id})")
+        
         # Wait a moment for the bot to fully connect
         await asyncio.sleep(2)
         
