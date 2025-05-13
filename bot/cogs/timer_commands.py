@@ -325,17 +325,18 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             # Add the timer
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
-            # Send confirmation to commands channel
-            cmd_channel = self.bot.get_channel(CONFIG['channels']['commands'])
-            if cmd_channel:
-                if similar_timers:
-                    similar_list = "\n".join([t.to_string() for t in similar_timers])
-                    await cmd_channel.send(
-                        f"⚠️ Auto-added timer from armor loss (with similar timers):\n{similar_list}\n"
-                        f"Added anyway with ID {new_timer.timer_id}"
-                    )
-                else:
-                    await cmd_channel.send(f"✅ Auto-added timer from armor loss with ID {new_timer.timer_id}")
+            # Send confirmation to all command channels
+            for server_config in CONFIG['servers'].values():
+                cmd_channel = self.bot.get_channel(server_config['commands'])
+                if cmd_channel:
+                    if similar_timers:
+                        similar_list = "\n".join([t.to_string() for t in similar_timers])
+                        await cmd_channel.send(
+                            f"⚠️ Auto-added timer from armor loss (with similar timers):\n{similar_list}\n"
+                            f"Added anyway with ID {new_timer.timer_id}"
+                        )
+                    else:
+                        await cmd_channel.send(f"✅ Auto-added timer from armor loss with ID {new_timer.timer_id}")
                     
             # Update timerboard
             timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])

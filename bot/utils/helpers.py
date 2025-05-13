@@ -12,4 +12,10 @@ def clean_system_name(system: str) -> str:
 async def cmd_channel_check(ctx):
     """Check if command is used in the correct channel"""
     logger.info(f"Command '{ctx.command}' received from {ctx.author} in #{ctx.channel.name}")
-    return ctx.channel.id == CONFIG['channels']['commands'] 
+    
+    # Check all server configs for matching command channel
+    for server_config in CONFIG['servers'].values():
+        if ctx.channel.id == server_config['commands']:
+            return True
+            
+    return False 
