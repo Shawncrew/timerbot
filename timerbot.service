@@ -7,7 +7,7 @@ Type=simple
 User=timerbot
 Group=timerbot
 WorkingDirectory=/opt/timerbot
-ExecStart=/usr/bin/python3 -m bot.main
+ExecStart=/usr/bin/python3 -m bot.run_bots
 Restart=always
 RestartSec=60
 

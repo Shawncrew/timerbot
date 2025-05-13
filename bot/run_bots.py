@@ -1,6 +1,13 @@
+import os
+import sys
+# Add the parent directory to PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncio
 import discord
 from discord.ext import commands
+
+# Use relative imports since we're inside the bot package
 from bot.utils.config import load_config
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard
