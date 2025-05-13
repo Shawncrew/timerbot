@@ -279,8 +279,8 @@ def run_bot():
         # Set up the bot first
         asyncio.run(setup())
         logger.info("Starting bot...")
-        # Then run it
-        bot.run(TOKEN, log_handler=None)  # Disable discord.py's default logging
+        # Then run it with the server1 token
+        bot.run(CONFIG['servers']['server1']['token'], log_handler=None)  # Use server1's token
     except Exception as e:
         logger.error(f"Error running bot: {e}")
 
