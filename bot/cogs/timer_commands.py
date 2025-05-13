@@ -210,39 +210,6 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             logger.error(f"Error refreshing timerboard: {e}")
             await ctx.send(f"Error refreshing timerboard: {e}")
 
-    @app_commands.command()
-    async def add(self, interaction: discord.Interaction, system: str, structure: str, time: str, tags: str = ""):
-        """Add a timer"""
-        try:
-            # ... existing validation code ...
-
-            # Add the timer
-            new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
-            
-            # Send response
-            if similar_timers:
-                similar_list = "\n".join([t.to_string() for t in similar_timers])
-                await interaction.response.send_message(
-                    f"⚠️ Added timer with similar existing timers:\n{similar_list}\n"
-                    f"Added anyway with ID {new_timer.timer_id}"
-                )
-            else:
-                await interaction.response.send_message(f"✅ Added timer with ID {new_timer.timer_id}")
-            
-            # Update all timerboards
-            timerboard_channels = [
-                self.bot.get_channel(server_config['timerboard'])
-                for server_config in CONFIG['servers'].values()
-                if server_config['timerboard'] is not None
-            ]
-            await self.timerboard.update_timerboard(timerboard_channels)
-            
-            logger.info(f"Successfully added timer with ID {new_timer.timer_id}")
-            
-        except Exception as e:
-            logger.error(f"Error adding timer: {e}")
-            await interaction.response.send_message(f"❌ Error adding timer: {e}")
-
     @commands.Cog.listener()
     async def on_message(self, message):
         """Monitor citadel channels for structure messages"""
