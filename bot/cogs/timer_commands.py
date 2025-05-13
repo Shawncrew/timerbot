@@ -88,7 +88,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                 else:
                     await ctx.send("Could not parse system name from structure")
                     return
-                
+                    
                 # Extract time and tags from the "Reinforced until" or "Anchoring until" line
                 time_match = re.search(r'(?:Reinforced|Anchoring) until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[2])
                 if time_match:
@@ -145,11 +145,6 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
-            # Update timerboard
-            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
-            if timerboard_channel:
-                await self.timerboard.update_timerboard(timerboard_channel)
-                
             # Send confirmation
             if similar_timers:
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
@@ -159,7 +154,15 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                 )
             else:
                 await ctx.send(f"✅ Timer added with ID {new_timer.timer_id}")
-                
+
+            # Update all timerboards
+            timerboard_channels = [
+                self.bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+                if server_config['timerboard'] is not None
+            ]
+            await self.timerboard.update_timerboard(timerboard_channels)
+            
         except Exception as e:
             logger.error(f"Error adding timer: {e}")
             await ctx.send(f"Error adding timer: {str(e)}")
