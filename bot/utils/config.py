@@ -3,7 +3,7 @@ import yaml
 from dotenv import load_dotenv
 from .logger import logger
 
-CONFIG_FILE = "/opt/timerbot/bot/config.yaml"
+CONFIG_FILE = "/opt/timerbot/config.yaml"
 
 def load_config():
     """Load configuration from config.yaml"""
