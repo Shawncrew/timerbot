@@ -243,6 +243,19 @@ async def on_command_error(ctx, error):
         logger.error(f"Error executing '{ctx.command}' by {ctx.author}: {error}")
         await ctx.send(f"Error executing command: {error}")
 
+@bot.event
+async def on_guild_join(guild):
+    """Log when bot joins a guild"""
+    logger.info(f"Bot joined guild: {guild.name} (ID: {guild.id})")
+    logger.info(f"Guild owner: {guild.owner}")
+    logger.info(f"Member count: {guild.member_count}")
+    logger.info(f"Bot's roles: {[role.name for role in guild.me.roles]}")
+
+@bot.event
+async def on_guild_remove(guild):
+    """Log when bot leaves a guild"""
+    logger.info(f"Bot removed from guild: {guild.name} (ID: {guild.id})")
+
 async def setup():
     """Initialize bot and cogs"""
     try:
