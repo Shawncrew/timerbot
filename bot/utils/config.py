@@ -34,6 +34,22 @@ def load_config():
                 loaded_config = yaml.safe_load(f)
                 logger.info(f"Raw loaded config: {loaded_config}")
                 
+                # Handle migration from old 'channels' format to new 'servers' format
+                if 'channels' in loaded_config and 'servers' not in loaded_config:
+                    logger.info("Migrating from old 'channels' format to new 'servers' format")
+                    loaded_config['servers'] = {
+                        'server1': loaded_config['channels'].copy()
+                    }
+                    # Keep server2 as None values
+                    loaded_config['servers']['server2'] = {
+                        'timerboard': None,
+                        'commands': None,
+                        'citadel_attacked': None,
+                        'citadel_info': None
+                    }
+                    # Remove old channels section
+                    del loaded_config['channels']
+                
                 # Ensure servers section exists
                 if 'servers' not in loaded_config:
                     logger.error("No 'servers' section found in config")
