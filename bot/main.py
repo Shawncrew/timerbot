@@ -169,44 +169,56 @@ async def on_ready():
         # Debug channel information
         logger.info("Checking channels...")
         
-        # Define channels to check with their requirements
-        channels_to_check = {
-            'timerboard': (CONFIG['channels']['timerboard'], True),
-            'commands': (CONFIG['channels']['commands'], True),
-            'citadel_attacked': (CONFIG['channels']['citadel_attacked'], False),
-            'citadel_info': (CONFIG['channels']['citadel_info'], False)
-        }
-        
-        # Check all channels
-        for channel_name, (channel_id, required_send) in channels_to_check.items():
-            channel = bot.get_channel(channel_id)
-            if not channel:
-                logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id})")
-                continue
-                
-            logger.info(f"Found {channel_name} channel: #{channel.name} (ID: {channel_id})")
-            perms = channel.permissions_for(channel.guild.me)
-            logger.info(f"Permissions for #{channel.name}:")
-            logger.info(f"  Can send messages: {perms.send_messages}")
-            logger.info(f"  Can read messages: {perms.read_messages}")
+        # Check channels for each server
+        for server_name, server_config in CONFIG['servers'].items():
+            logger.info(f"Checking channels for {server_name}:")
             
-            if not perms.read_messages:
-                logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
-            if required_send and not perms.send_messages:
-                logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
+            # Define channels to check with their requirements
+            channels_to_check = {
+                'timerboard': (server_config['timerboard'], True),
+                'commands': (server_config['commands'], True),
+                'citadel_attacked': (server_config['citadel_attacked'], False),
+                'citadel_info': (server_config['citadel_info'], False)
+            }
+            
+            # Check all channels
+            for channel_name, (channel_id, required_send) in channels_to_check.items():
+                if channel_id is None:
+                    logger.info(f"Channel '{channel_name}' not configured for {server_name}")
+                    continue
+                    
+                channel = bot.get_channel(channel_id)
+                if not channel:
+                    logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id}) for {server_name}")
+                    continue
+                    
+                logger.info(f"Found {channel_name} channel: #{channel.name} (ID: {channel_id})")
+                perms = channel.permissions_for(channel.guild.me)
+                logger.info(f"Permissions for #{channel.name}:")
+                logger.info(f"  Can send messages: {perms.send_messages}")
+                logger.info(f"  Can read messages: {perms.read_messages}")
+                
+                if not perms.read_messages:
+                    logger.error(f"❌ Bot cannot read messages in #{channel.name}!")
+                if required_send and not perms.send_messages:
+                    logger.error(f"❌ Bot cannot send messages in #{channel.name}!")
         
         logger.info("Channel checks completed, starting bot services...")
         
         # Start timer check loop
         bot.loop.create_task(check_timers())
         
-        # Update the timerboard display
-        timerboard_channel = bot.get_channel(CONFIG['channels']['timerboard'])
-        if timerboard_channel:
-            await timerboard.update_timerboard([timerboard_channel])
-            logger.info("Updated timerboard display")
+        # Update all timerboards
+        timerboard_channels = [
+            bot.get_channel(server_config['timerboard'])
+            for server_config in CONFIG['servers'].values()
+            if server_config['timerboard'] is not None
+        ]
+        if timerboard_channels:
+            await timerboard.update_timerboard(timerboard_channels)
+            logger.info("Updated timerboard displays")
         else:
-            logger.error("❌ Could not update timerboard - channel not found")
+            logger.error("❌ Could not update timerboards - no channels found")
             
     except Exception as e:
         logger.error(f"Error in on_ready: {e}")
