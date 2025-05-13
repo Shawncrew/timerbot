@@ -274,13 +274,18 @@ Note: Medium structures should use "HULL" since there is only one timer."""
         """Monitor citadel channels for structure messages"""
         try:
             # Check if this is one of our monitored channels
-            if message.channel.id not in [CONFIG['channels']['citadel_attacked'], CONFIG['channels']['citadel_info']]:
-                return
-
-            if message.channel.id == CONFIG['channels']['citadel_attacked'] and message.content.startswith('Structure lost armor'):
-                await self.handle_armor_loss(message)
-            elif message.channel.id == CONFIG['channels']['citadel_info'] and message.content.startswith('Structure full power'):
-                await self.handle_structure_repair(message)
+            for server_config in CONFIG['servers'].values():
+                if message.channel.id in [
+                    server_config.get('citadel_attacked'),
+                    server_config.get('citadel_info')
+                ]:
+                    if (message.channel.id == server_config.get('citadel_attacked') and 
+                        message.content.startswith('Structure lost armor')):
+                        await self.handle_armor_loss(message)
+                    elif (message.channel.id == server_config.get('citadel_info') and 
+                          message.content.startswith('Structure full power')):
+                        await self.handle_structure_repair(message)
+                    break
 
         except Exception as e:
             logger.error(f"Error processing structure message: {e}")
