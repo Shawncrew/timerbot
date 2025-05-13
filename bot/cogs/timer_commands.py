@@ -307,7 +307,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             logger.error(f"Error processing armor loss message: {e}")
 
     async def handle_structure_repair(self, message):
-        """Handle structure repair messages and remove NC Ansiblex timers"""
+        """Handle structure repair messages and remove timers"""
         try:
             logger.info("Processing structure repair message")
             
@@ -355,4 +355,4 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                 await self.timerboard.update_timerboard(timerboard_channel)
             
         except Exception as e:
-            logger.error(f"Error processing repair message: {e}") 
+            logger.error(f"Error processing structure repair message: {e}") 
