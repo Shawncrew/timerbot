@@ -155,14 +155,21 @@ async def check_channel_access(bot, channel_id, channel_name, required_send=Fals
 async def on_ready():
     try:
         logger.info(f"Bot connected as {bot.user}")
+        logger.info(f"Bot application ID: {bot.user.id}")
         
         # Debug guild and channel info
         logger.info("Connected to guilds:")
         for guild in bot.guilds:
             logger.info(f"  Guild: {guild.name} (ID: {guild.id})")
-            logger.info("  Channels:")
+            logger.info(f"  Is bot connected: {guild.me and guild.me.status}")
+            logger.info(f"  Bot roles: {[role.name for role in guild.me.roles if guild.me]}")
+            logger.info("  Visible channels:")
             for channel in guild.channels:
-                logger.info(f"    - #{channel.name} (ID: {channel.id})")
+                if isinstance(channel, discord.TextChannel):
+                    logger.info(f"    - #{channel.name} (ID: {channel.id})")
+                    perms = channel.permissions_for(guild.me)
+                    logger.info(f"      Can view: {perms.view_channel}")
+                    logger.info(f"      Can send: {perms.send_messages}")
         
         # Wait a moment for the bot to fully connect
         await asyncio.sleep(2)
