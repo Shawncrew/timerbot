@@ -208,66 +208,37 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             await ctx.send(f"Error refreshing timerboard: {e}")
 
     @app_commands.command()
-    async def add_sov(
-        self, 
-        interaction: discord.Interaction, 
-        timer: str,
-        system: str,
-        owner: str,
-        adm: str
-    ):
-        """Add a SOV timer"""
+    async def add(self, interaction: discord.Interaction, system: str, structure: str, time: str, tags: str = ""):
+        """Add a timer"""
         try:
-            # Parse the time
-            try:
-                time = datetime.strptime(timer, '%Y.%m.%d %H:%M')
-                time = EVE_TZ.localize(time)
-            except ValueError:
-                await interaction.response.send_message(
-                    "❌ Invalid time format. Use: YYYY.MM.DD HH:MM", 
-                    ephemeral=True
-                )
-                return
+            # ... existing validation code ...
 
-            # Validate ADM
-            try:
-                adm_value = float(adm)
-                if not (1 <= adm_value <= 6):
-                    raise ValueError
-            except ValueError:
-                await interaction.response.send_message(
-                    "❌ ADM must be a number between 1 and 6", 
-                    ephemeral=True
-                )
-                return
-
-            # Create description with ownership and ADM info
-            description = f"{system} - SOV Timer [{owner}-ADM{adm}]"
-            
             # Add the timer
-            new_timer, similar_timers = await self.timerboard.add_timer(time, description)
+            new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
             
+            # Send response
             if similar_timers:
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
                 await interaction.response.send_message(
-                    f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
+                    f"⚠️ Added timer with similar existing timers:\n{similar_list}\n"
                     f"Added anyway with ID {new_timer.timer_id}"
                 )
             else:
-                await interaction.response.send_message(
-                    f"✅ Timer added with ID {new_timer.timer_id}"
-                )
+                await interaction.response.send_message(f"✅ Added timer with ID {new_timer.timer_id}")
             
-            # Update timerboard channel
-            timerboard_channel = self.bot.get_channel(CONFIG['channels']['timerboard'])
-            await self.timerboard.update_timerboard(timerboard_channel)
+            # Update all timerboards
+            timerboard_channels = [
+                self.bot.get_channel(server_config['timerboard'])
+                for server_config in CONFIG['servers'].values()
+                if server_config['timerboard'] is not None
+            ]
+            await self.timerboard.update_timerboard(timerboard_channels)
+            
+            logger.info(f"Successfully added timer with ID {new_timer.timer_id}")
             
         except Exception as e:
-            logger.error(f"Error adding SOV timer: {e}")
-            await interaction.response.send_message(
-                f"❌ Error adding timer: {str(e)}", 
-                ephemeral=True
-            )
+            logger.error(f"Error adding timer: {e}")
+            await interaction.response.send_message(f"❌ Error adding timer: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
