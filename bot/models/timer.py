@@ -9,6 +9,7 @@ from bot.utils.logger import logger
 from bot.utils.helpers import clean_system_name
 from bot.utils.config import CONFIG
 from bot.utils.eve_data import get_region
+import asyncio
 
 EVE_TZ = pytz.timezone('UTC')
 SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
@@ -62,8 +63,25 @@ class TimerBoard:
     def __init__(self):
         self.timers = []
         self.next_id = self.STARTING_TIMER_ID
+        self.bots = []  # List to store bot instances
         self.last_update = None
         self.load_data()
+
+    def register_bot(self, bot, server_config):
+        """Register a bot instance and its config for timerboard updates"""
+        self.bots.append((bot, server_config))
+        logger.info(f"Registered bot {bot.user if bot.user else 'Unknown'} for timerboard updates")
+
+    async def update_all_timerboards(self):
+        """Update timerboards in all registered servers"""
+        logger.info(f"Updating timerboards in {len(self.bots)} servers")
+        for bot, server_config in self.bots:
+            channel = bot.get_channel(server_config['timerboard'])
+            if channel:
+                logger.info(f"Updating timerboard in {channel.guild.name}")
+                await self.update_timerboard([channel])
+            else:
+                logger.warning(f"Could not find timerboard channel for bot {bot.user}")
 
     def save_data(self):
         """Save timerboard data to JSON file"""
@@ -157,7 +175,7 @@ class TimerBoard:
         self.timers.sort(key=lambda x: x.time)
 
     async def add_timer(self, time: datetime.datetime, description: str) -> tuple[Timer, list[Timer]]:
-        """Add a new timer and return it along with any similar timers found"""
+        """Add a new timer and update all timerboards"""
         try:
             # Parse system and structure name from description
             system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
@@ -206,7 +224,10 @@ class TimerBoard:
             self.timers.append(new_timer)
             self.next_id += 1
             self.sort_timers()
+            
+            # Save and update all timerboards
             self.save_data()
+            await self.update_all_timerboards()
             
             logger.info(f"Successfully added timer with ID {new_timer.timer_id}")
             return new_timer, similar_timers
@@ -216,21 +237,20 @@ class TimerBoard:
             raise
 
     def remove_timer(self, timer_id: int) -> Optional[Timer]:
-        """Remove a timer by its ID"""
-        for timer in self.timers:
-            if timer.timer_id == timer_id:
-                self.timers.remove(timer)
-                self.save_data()
-                logger.info(f"Removed timer {timer_id}:")
-                logger.info(f"  System: {timer.system} ({timer.region})")
-                logger.info(f"  Structure: {timer.structure_name}")
-                logger.info(f"  Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
-                if timer.notes:
-                    logger.info(f"  Tags: {timer.notes}")
-                return timer
+        """Remove a timer and update all timerboards"""
+        timer = None
+        for t in self.timers:
+            if t.timer_id == timer_id:
+                timer = t
+                self.timers.remove(t)
+                break
                 
-        logger.warning(f"Attempted to remove non-existent timer {timer_id}")
-        return None
+        if timer:
+            self.save_data()
+            # Schedule timerboard update
+            asyncio.create_task(self.update_all_timerboards())
+            
+        return timer
 
     def remove_expired(self) -> list[Timer]:
         """Remove timers that are older than the configured expiry time"""

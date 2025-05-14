@@ -34,6 +34,9 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 logger.info(f"  Is bot connected: {guild.me and guild.me.status}")
                 logger.info(f"  Bot roles: {[role.name for role in guild.me.roles if guild.me]}")
             
+            # Register this bot with the timerboard
+            shared_timerboard.register_bot(bot, server_config)
+            
             # Initial timerboard update
             logger.info(f"Performing initial timerboard update for {server_name}")
             timerboard_channel = bot.get_channel(server_config['timerboard'])
