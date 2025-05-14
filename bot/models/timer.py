@@ -24,13 +24,28 @@ class Timer:
     message_id: Optional[int] = None
     region: str = ""  # Add region field
 
+    def __init__(self, time, description, timer_id=None):
+        self.time = time
+        self.description = description
+        self.timer_id = timer_id
+        
+        # Parse system and structure name from description
+        match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?:\s+\[.*\])?$', description)
+        if match:
+            self.system = match.group(1)
+            self.structure_name = match.group(2).strip()
+            self.notes = description[len(match.group(0)):].strip()
+        else:
+            self.system = "Unknown"
+            self.structure_name = description
+            self.notes = ""
+            
     def to_string(self) -> str:
         """Format timer for display"""
-        time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
-        clean_system = clean_system_name(self.system)
-        system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
-        notes_str = f" {self.notes}" if self.notes else ""
-        return f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}{notes_str} ({self.timer_id})"
+        return f"{self.time.strftime('%Y-%m-%d %H:%M:%S')} {self.description} ({self.timer_id})"
+        
+    def __str__(self) -> str:
+        return self.to_string()
 
     def is_similar(self, other: 'Timer') -> bool:
         time_diff = abs((self.time - other.time).total_seconds()) / 60
@@ -241,6 +256,8 @@ class TimerBoard:
             channels = [channels]
             
         logger.info(f"Updating timerboard in {len(channels)} channels")
+        logger.info(f"Current timers: {[str(t) for t in self.timers]}")  # Log all current timers
+        
         for channel in channels:
             if not channel:
                 logger.warning("Skipping update for None channel")
@@ -254,6 +271,7 @@ class TimerBoard:
                 
                 # Sort timers by time
                 sorted_timers = sorted(self.timers, key=lambda x: x.time)
+                logger.info(f"Sorted timers for {channel.guild.name}: {[str(t) for t in sorted_timers]}")
                 
                 # Build timer list
                 timer_list = []
@@ -262,6 +280,7 @@ class TimerBoard:
                 
                 # Combine all parts
                 message = header + "\n".join(timer_list)
+                logger.info(f"Generated message for {channel.guild.name}:\n{message}")
                 
                 # Find existing timerboard message
                 async for msg in channel.history(limit=100):
