@@ -28,15 +28,23 @@ class Timer:
     def __post_init__(self):
         """Parse system and structure name from description after initialization"""
         # Parse system and structure name from description
-        match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?:\s+\[.*\])?$', self.description)
+        match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?=\s*\[|$)', self.description)
         if match:
             self.system = match.group(1)
             self.structure_name = match.group(2).strip()
-            self.notes = self.description[len(match.group(0)):].strip()
+            
+            # Extract tags (everything in square brackets)
+            tags_match = re.findall(r'\[(.*?)\]', self.description)
+            self.notes = ' '.join(f'[{tag}]' for tag in tags_match) if tags_match else ""
+            
+            # Get region info if not already set
+            if not self.region:
+                self.region = get_region(self.system)
         else:
             self.system = "Unknown"
             self.structure_name = self.description
             self.notes = ""
+            self.region = ""
 
     def to_string(self) -> str:
         """Format timer for display"""
@@ -44,7 +52,8 @@ class Timer:
         clean_system = clean_system_name(self.system)
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         notes_str = f" {self.notes}" if self.notes else ""
-        return f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}{notes_str} ({self.timer_id})"
+        region_str = f" ({self.region})" if self.region else ""
+        return f"`{time_str}` {system_link}{region_str} - {self.structure_name}{notes_str} ({self.timer_id})"
 
     def __str__(self) -> str:
         return self.to_string()
