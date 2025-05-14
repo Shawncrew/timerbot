@@ -21,7 +21,6 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     
     bot = commands.Bot(command_prefix='!', intents=intents)
     
-    # Add event handlers
     @bot.event
     async def on_ready():
         try:
@@ -35,12 +34,14 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 logger.info(f"  Is bot connected: {guild.me and guild.me.status}")
                 logger.info(f"  Bot roles: {[role.name for role in guild.me.roles if guild.me]}")
             
-            # Sync commands
-            try:
-                synced = await bot.tree.sync()
-                logger.info(f"Synced {len(synced)} commands for {server_name}")
-            except Exception as e:
-                logger.error(f"Error syncing commands for {server_name}: {e}")
+            # Initial timerboard update
+            logger.info(f"Performing initial timerboard update for {server_name}")
+            timerboard_channel = bot.get_channel(server_config['timerboard'])
+            if timerboard_channel:
+                logger.info(f"Found timerboard channel: {timerboard_channel.name} in {timerboard_channel.guild.name}")
+                await shared_timerboard.update_timerboard([timerboard_channel])
+            else:
+                logger.error(f"Could not find timerboard channel for {server_name}")
                 
         except Exception as e:
             logger.error(f"Error in on_ready for {server_name}: {e}")
@@ -62,9 +63,11 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     await bot.add_cog(cog)
     
     try:
+        logger.info(f"Starting bot for {server_name} with token: {server_config['token'][:20]}...")
         await bot.start(server_config['token'])
     except Exception as e:
         logger.error(f"Error running bot for {server_name}: {e}")
+        logger.exception("Full traceback:")
 
 async def main():
     """Run all bot instances"""
