@@ -257,14 +257,16 @@ class TimerBoard:
             channels = [channels]
             
         logger.info(f"Updating timerboard in {len(channels)} channels")
-        logger.info(f"Current timers: {[str(t) for t in self.timers]}")  # Log all current timers
+        logger.info(f"Current timers in memory: {len(self.timers)}")
+        for timer in self.timers:
+            logger.info(f"  Timer: {timer}")
         
         for channel in channels:
             if not channel:
                 logger.warning("Skipping update for None channel")
                 continue
                 
-            logger.info(f"Updating timerboard in server: {channel.guild.name}")
+            logger.info(f"Updating timerboard in server: {channel.guild.name} (Channel: {channel.name})")
             try:
                 # Create the timerboard message
                 now = datetime.datetime.now(EVE_TZ)
@@ -272,27 +274,35 @@ class TimerBoard:
                 
                 # Sort timers by time
                 sorted_timers = sorted(self.timers, key=lambda x: x.time)
-                logger.info(f"Sorted timers for {channel.guild.name}: {[str(t) for t in sorted_timers]}")
+                logger.info(f"Sorted timers for {channel.guild.name}: {len(sorted_timers)} timers")
                 
                 # Build timer list
                 timer_list = []
                 for timer in sorted_timers:
                     timer_list.append(timer.to_string())
+                    logger.info(f"Added timer to list: {timer}")
                 
                 # Combine all parts
-                message = header + "\n".join(timer_list)
-                logger.info(f"Generated message for {channel.guild.name}:\n{message}")
+                message = header + "\n".join(timer_list) if timer_list else header + "No active timers."
                 
-                # Find existing timerboard message
+                # Find and update the most recent bot message
+                most_recent_msg = None
                 async for msg in channel.history(limit=100):
                     if msg.author == channel.guild.me:
-                        await msg.edit(content=message)
-                        logger.info(f"Updated existing timerboard in {channel.guild.name}")
+                        most_recent_msg = msg
                         break
+                
+                if most_recent_msg:
+                    logger.info(f"Found existing message in {channel.guild.name}, updating...")
+                    logger.info(f"Old content:\n{most_recent_msg.content}")
+                    logger.info(f"New content:\n{message}")
+                    await most_recent_msg.edit(content=message)
+                    logger.info(f"Successfully updated timerboard in {channel.guild.name}")
                 else:
-                    # No existing message found, create new one
+                    logger.info(f"No existing message found in {channel.guild.name}, creating new...")
                     await channel.send(message)
-                    logger.info(f"Created new timerboard in {channel.guild.name}")
+                    logger.info(f"Successfully created new timerboard in {channel.guild.name}")
                     
             except Exception as e:
-                logger.error(f"Error updating timerboard in {channel.guild.name}: {e}") 
+                logger.error(f"Error updating timerboard in {channel.guild.name}: {e}")
+                logger.exception("Full traceback:") 
