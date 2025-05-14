@@ -68,18 +68,42 @@ class TimerBoard:
     SAVE_FILE = SAVE_FILE
     STARTING_TIMER_ID = 1000
     MAX_MESSAGE_LENGTH = 1900
+    UPDATE_INTERVAL = 60  # Update interval in seconds
     
     def __init__(self):
         self.timers = []
         self.next_id = self.STARTING_TIMER_ID
         self.bots = []  # List to store bot instances
         self.last_update = None
+        self.update_task = None
         self.load_data()
 
     def register_bot(self, bot, server_config):
         """Register a bot instance and its config for timerboard updates"""
         self.bots.append((bot, server_config))
         logger.info(f"Registered bot {bot.user if bot.user else 'Unknown'} for timerboard updates")
+        
+        # Start the update task if this is the first bot
+        if len(self.bots) == 1:
+            self.start_update_task()
+
+    def start_update_task(self):
+        """Start the periodic update task"""
+        if not self.update_task:
+            logger.info("Starting periodic timerboard update task")
+            
+            async def update_loop():
+                while True:
+                    try:
+                        await self.update_all_timerboards()
+                        await asyncio.sleep(self.UPDATE_INTERVAL)
+                    except Exception as e:
+                        logger.error(f"Error in timerboard update loop: {e}")
+                        logger.exception("Full traceback:")
+                        await asyncio.sleep(self.UPDATE_INTERVAL)
+            
+            self.update_task = asyncio.create_task(update_loop())
+            logger.info("Timerboard update task started")
 
     async def update_all_timerboards(self):
         """Update timerboards in all registered servers"""

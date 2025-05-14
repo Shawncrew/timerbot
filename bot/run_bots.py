@@ -79,15 +79,26 @@ async def main():
     # Create shared timerboard
     timerboard = TimerBoard()
     
-    # Create tasks for each bot
-    tasks = []
-    for server_name, server_config in config['servers'].items():
-        if server_config['token']:  # Only run if token is configured
-            task = run_bot_instance(server_name, server_config, timerboard)
-            tasks.append(task)
-    
-    # Run all bots
-    await asyncio.gather(*tasks)
+    try:
+        # Create tasks for each bot
+        tasks = []
+        for server_name, server_config in config['servers'].items():
+            if server_config['token']:  # Only run if token is configured
+                task = run_bot_instance(server_name, server_config, timerboard)
+                tasks.append(task)
+        
+        # Run all bots
+        await asyncio.gather(*tasks)
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt, shutting down...")
+    finally:
+        # Cancel the update task if it exists
+        if timerboard.update_task:
+            timerboard.update_task.cancel()
+            try:
+                await timerboard.update_task
+            except asyncio.CancelledError:
+                pass
 
 if __name__ == "__main__":
     asyncio.run(main()) 
