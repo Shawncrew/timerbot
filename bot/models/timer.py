@@ -50,9 +50,11 @@ class Timer:
         """Format timer for display"""
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
-        system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
-        notes_str = f" {self.notes}" if self.notes else ""
+        # Use <> to prevent link preview
+        system_link = f"{self.system} <https://evemaps.dotlan.net/system/{clean_system}>"
         region_str = f" ({self.region})" if self.region else ""
+        notes_str = f" {self.notes}" if self.notes else ""
+        
         return f"`{time_str}` {system_link}{region_str} - {self.structure_name}{notes_str} ({self.timer_id})"
 
     def __str__(self) -> str:
