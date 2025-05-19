@@ -175,7 +175,8 @@ Note: Medium structures should use "HULL" since there is only one timer."""
         if timer:
             logger.info(f"{ctx.author} removed timer {timer_id}")
             clean_system = clean_system_name(timer.system)
-            system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
+            # Use <> to prevent preview in removal message
+            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
             await ctx.send(f"Removed timer: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})")
             
             # Update all timerboards
@@ -291,7 +292,9 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             f"Added anyway with ID {new_timer.timer_id}"
                         )
                     else:
-                        await cmd_channel.send(f"✅ Auto-added timer from armor loss with ID {new_timer.timer_id}")
+                        clean_system = clean_system_name(system)
+                        system_link = f"[{system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                        await cmd_channel.send(f"✅ Auto-added timer from armor loss: {system_link} - {structure_name} at {time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {new_timer.timer_id})")
                     
             # Update all timerboards
             timerboard_channels = [
@@ -344,8 +347,10 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     # Send confirmation to commands channel
                     cmd_channel = self.bot.get_channel(CONFIG['channels']['commands'])
                     if cmd_channel:
+                        clean_system = clean_system_name(system)
+                        system_link = f"[{system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
                         await cmd_channel.send(
-                            f"✅ Removed timer for repaired NC Ansiblex: {system} - {structure_name} (ID: {timer.timer_id})"
+                            f"✅ Removed timer for repaired NC Ansiblex: {system_link} - {structure_name} (ID: {timer.timer_id})"
                         )
             
             if removed:
