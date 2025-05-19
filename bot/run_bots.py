@@ -66,6 +66,14 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     cog = TimerCommands(bot, shared_timerboard)
     await bot.add_cog(cog)
     
+    # Move check_timers inside setup_hook
+    async def setup_hook():
+        """Setup hook for bot initialization"""
+        # Start the timer check loop
+        asyncio.create_task(check_timers())
+        
+    bot.setup_hook = setup_hook
+    
     async def check_timers():
         """Check for timers that are about to start and alert if needed"""
         await bot.wait_until_ready()
@@ -135,9 +143,6 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             except Exception as e:
                 logger.error(f"Error in timer check loop for {server_name}: {e}")
                 await asyncio.sleep(CONFIG['check_interval'])
-    
-    # Start the timer check loop
-    bot.loop.create_task(check_timers())
     
     try:
         logger.info(f"Starting bot for {server_name} with token: {server_config['token'][:20]}...")
