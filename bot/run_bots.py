@@ -86,7 +86,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             try:
                 start_time = datetime.datetime.now()
                 now = datetime.datetime.now(EVE_TZ)
-                logger.debug(f"Checking timers at {now} for {server_name}")
+                logger.info(f"Timer check at {now} for {server_name}")
                 
                 # Get command channel for this server
                 cmd_channel = bot.get_channel(server_config['commands'])
@@ -98,12 +98,11 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     and (timer.time - now).total_seconds() <= 3600
                 ]
                 
-                if upcoming_timers:
-                    logger.debug(f"Found {len(upcoming_timers)} upcoming timers")
-                    
+                logger.info(f"Found {len(upcoming_timers)} upcoming timers")
+                
                 for timer in upcoming_timers:
                     time_until = (timer.time - now).total_seconds() / 60
-                    logger.debug(f"Timer {timer.timer_id} is {time_until:.1f} minutes away")
+                    logger.info(f"Timer {timer.timer_id} is {time_until:.1f} minutes away")
                     
                     # Alert at 60 minutes if not already alerted
                     if 59 <= time_until <= 60 and timer.timer_id not in sixty_min_alerted:
@@ -142,6 +141,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 # Calculate sleep time to ensure we check exactly every minute
                 elapsed = (datetime.datetime.now() - start_time).total_seconds()
                 sleep_time = max(1, CONFIG['check_interval'] - elapsed)
+                logger.info(f"Sleeping for {sleep_time:.1f} seconds until next check")
                 await asyncio.sleep(sleep_time)
                 
             except Exception as e:
