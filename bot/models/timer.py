@@ -50,8 +50,8 @@ class Timer:
         """Format timer for display"""
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
-        # Wrap entire markdown link in <> to suppress preview
-        system_link = f"<[{self.system}](https://evemaps.dotlan.net/system/{clean_system})>"
+        # Wrap URL in <> to prevent preview
+        system_link = f"{self.system} <https://evemaps.dotlan.net/system/{clean_system}>"
         region_str = f" ({self.region})" if self.region else ""
         notes_str = f" {self.notes}" if self.notes else ""
         
