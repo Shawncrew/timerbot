@@ -27,11 +27,11 @@ class Timer:
 
     def __post_init__(self):
         """Parse system and structure name from description after initialization"""
-        # Parse system and structure name from description
-        match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?=\s*\[|$)', self.description)
-        if match:
-            self.system = match.group(1)
-            self.structure_name = match.group(2).strip()
+        # First try to parse Sov Hub format
+        sov_hub_match = re.match(r'Sov Hub \((.*?)\)', self.description)
+        if sov_hub_match:
+            self.system = sov_hub_match.group(1)
+            self.structure_name = "Sov Hub"
             
             # Extract tags (everything in square brackets)
             tags_match = re.findall(r'\[(.*?)\]', self.description)
@@ -41,10 +41,24 @@ class Timer:
             if not self.region:
                 self.region = get_region(self.system)
         else:
-            self.system = "Unknown"
-            self.structure_name = self.description
-            self.notes = ""
-            self.region = ""
+            # Try standard format
+            match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?=\s*\[|$)', self.description)
+            if match:
+                self.system = match.group(1)
+                self.structure_name = match.group(2).strip()
+                
+                # Extract tags
+                tags_match = re.findall(r'\[(.*?)\]', self.description)
+                self.notes = ' '.join(f'[{tag}]' for tag in tags_match) if tags_match else ""
+                
+                # Get region info
+                if not self.region:
+                    self.region = get_region(self.system)
+            else:
+                self.system = "Unknown"
+                self.structure_name = self.description
+                self.notes = ""
+                self.region = ""
 
     def to_string(self) -> str:
         """Format timer for display"""
