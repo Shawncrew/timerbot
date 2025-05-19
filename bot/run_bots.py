@@ -84,6 +84,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
         
         while not bot.is_closed():
             try:
+                start_time = datetime.datetime.now()
                 now = datetime.datetime.now(EVE_TZ)
                 logger.debug(f"Checking timers at {now} for {server_name}")
                 
@@ -138,7 +139,10 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                         sixty_min_alerted.discard(timer.timer_id)
                         start_time_alerted.discard(timer.timer_id)
                 
-                await asyncio.sleep(CONFIG['check_interval'])
+                # Calculate sleep time to ensure we check exactly every minute
+                elapsed = (datetime.datetime.now() - start_time).total_seconds()
+                sleep_time = max(1, CONFIG['check_interval'] - elapsed)
+                await asyncio.sleep(sleep_time)
                 
             except Exception as e:
                 logger.error(f"Error in timer check loop for {server_name}: {e}")
