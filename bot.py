@@ -340,12 +340,21 @@ class TimerBoard:
         now = datetime.datetime.now(EVE_TZ)
         expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
         
+        logger.info(f"Checking for expired timers. Current time: {now}, Expiry threshold: {expiry_threshold}")
+        logger.info(f"Total timers before check: {len(self.timers)}")
+        
         expired = [t for t in self.timers if t.time < expiry_threshold]
         
         if expired:
+            logger.info(f"Found {len(expired)} expired timers:")
+            for timer in expired:
+                logger.info(f"- Timer {timer.timer_id}: {timer.time} (expired {int((now - timer.time).total_seconds() / 60)} minutes ago)")
+            
             self.timers = [t for t in self.timers if t.time >= expiry_threshold]
-            logger.info(f"Removed {len(expired)} expired timers")
+            logger.info(f"Remaining timers after removal: {len(self.timers)}")
             self.save_data()  # Save after removing expired timers
+        else:
+            logger.info("No expired timers found")
         
         return expired
 
@@ -408,6 +417,7 @@ async def check_timers():
     while not bot.is_closed():
         try:
             now = datetime.datetime.now(EVE_TZ)
+            logger.info(f"Running timer check at {now}")
             
             # Check for timers that are about to happen or starting now
             for timer in timerboard.timers:
@@ -435,18 +445,26 @@ async def check_timers():
                         logger.info(f"Sent start alert for timer {timer.timer_id}")
             
             # Check for expired timers
+            logger.info("Checking for expired timers...")
             expired = timerboard.remove_expired()
             if expired:
                 logger.info(f"Removed {len(expired)} expired timers:")
                 for timer in expired:
                     logger.info(f"- {timer.to_string()}")
                 channel = bot.get_channel(TIMERBOARD_CHANNEL_ID)
-                await timerboard.update_timerboard(channel)
+                if channel:
+                    logger.info("Updating timerboard display...")
+                    await timerboard.update_timerboard(channel)
+                    logger.info("Timerboard display updated")
+                else:
+                    logger.error("Could not find timerboard channel to update display")
+            else:
+                logger.info("No expired timers to remove")
             
             await asyncio.sleep(CONFIG['check_interval'])
             
         except Exception as e:
-            logger.error(f"Error in timer check loop: {e}")
+            logger.error(f"Error in timer check loop: {e}", exc_info=True)
             await asyncio.sleep(CONFIG['check_interval'])
 
 @bot.event
