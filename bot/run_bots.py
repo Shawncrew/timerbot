@@ -11,8 +11,9 @@ import datetime
 # Use relative imports since we're inside the bot package
 from bot.utils.config import load_config
 from bot.utils.logger import logger
-from bot.models.timer import TimerBoard
+from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands
+from bot.utils.helpers import clean_system_name
 
 async def run_bot_instance(server_name, server_config, shared_timerboard):
     """Run a single bot instance for a server"""
