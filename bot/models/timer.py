@@ -315,15 +315,18 @@ class TimerBoard:
             logger.info(f"  Timer time: {timer.time}")
             logger.info(f"  System: {timer.system} ({timer.region})")
             logger.info(f"  Structure: {timer.structure_name}")
-            minutes_old = (now - timer.time).total_seconds() / 60
-            logger.info(f"  Minutes since timer: {minutes_old:.1f}")
-            logger.info(f"  Is expired: {timer.time < expiry_threshold}")
+            minutes_past_timer = (now - timer.time).total_seconds() / 60
+            minutes_until_expiry = minutes_past_timer - CONFIG['expiry_time']
+            logger.info(f"  Minutes past timer time: {minutes_past_timer:.1f}")
+            logger.info(f"  Minutes until expiry: {minutes_until_expiry:.1f}")
+            logger.info(f"  Should expire: {minutes_past_timer > CONFIG['expiry_time']}")
         
-        expired = [t for t in self.timers if t.time < expiry_threshold]
+        # Only remove timers that are past the expiry window
+        expired = [t for t in self.timers if (now - t.time).total_seconds() / 60 > CONFIG['expiry_time']]
         
         if expired:
             # Remove expired timers from the list
-            self.timers = [t for t in self.timers if t.time >= expiry_threshold]
+            self.timers = [t for t in self.timers if (now - t.time).total_seconds() / 60 <= CONFIG['expiry_time']]
             logger.info(f"Removing {len(expired)} expired timers:")
             for timer in expired:
                 logger.info(f"  - ID {timer.timer_id}: {timer.system} ({timer.region}) - {timer.structure_name}")
