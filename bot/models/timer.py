@@ -306,6 +306,19 @@ class TimerBoard:
         now = datetime.datetime.now(EVE_TZ)
         expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
         
+        logger.info(f"Checking for expired timers at {now}")
+        logger.info(f"Expiry threshold: {expiry_threshold}")
+        
+        # Check each timer
+        for timer in self.timers:
+            logger.info(f"Checking timer {timer.timer_id} for expiry:")
+            logger.info(f"  Timer time: {timer.time}")
+            logger.info(f"  System: {timer.system} ({timer.region})")
+            logger.info(f"  Structure: {timer.structure_name}")
+            minutes_old = (now - timer.time).total_seconds() / 60
+            logger.info(f"  Minutes since timer: {minutes_old:.1f}")
+            logger.info(f"  Is expired: {timer.time < expiry_threshold}")
+        
         expired = [t for t in self.timers if t.time < expiry_threshold]
         
         if expired:
@@ -323,6 +336,8 @@ class TimerBoard:
             
             # Schedule an update of all timerboards
             asyncio.create_task(self.update_all_timerboards())
+        else:
+            logger.info("No expired timers found")
         
         return expired
 

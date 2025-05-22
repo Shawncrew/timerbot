@@ -86,7 +86,16 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             try:
                 start_time = datetime.datetime.now()
                 now = datetime.datetime.now(EVE_TZ)
-                logger.info(f"Timer check at {now} for {server_name}")
+                logger.info(f"\nTimer check cycle at {now} for {server_name}")
+                
+                # First check for expired timers
+                logger.info("Checking for expired timers...")
+                expired = shared_timerboard.remove_expired()
+                if expired:
+                    for timer in expired:
+                        sixty_min_alerted.discard(timer.timer_id)
+                        start_time_alerted.discard(timer.timer_id)
+                        logger.info(f"Removed expired timer {timer.timer_id} from alert tracking")
                 
                 # Get command channel for this server
                 cmd_channel = bot.get_channel(server_config['commands'])
@@ -148,13 +157,6 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                             logger.info(f"  Start alert already sent for timer {timer.timer_id}")
                     else:
                         logger.info(f"  Timer not in any alert window")
-                
-                # Clean up expired timers from both alert sets
-                expired = shared_timerboard.remove_expired()
-                if expired:
-                    for timer in expired:
-                        sixty_min_alerted.discard(timer.timer_id)
-                        start_time_alerted.discard(timer.timer_id)
                 
                 # Calculate sleep time to ensure we check exactly every minute
                 elapsed = (datetime.datetime.now() - start_time).total_seconds()
