@@ -105,14 +105,14 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     await asyncio.sleep(CONFIG['check_interval'])
                     continue
                 
-                # Get all timers that are within the next hour
+                # Get all timers that are within the next hour or not yet expired
                 upcoming_timers = [
                     timer for timer in shared_timerboard.timers 
-                    if timer.time > now 
-                    and (timer.time - now).total_seconds() <= 3600
+                    if ((timer.time > now and (timer.time - now).total_seconds() <= 3600) or  # Future timers within 1 hour
+                        (timer.time <= now and (now - timer.time).total_seconds() <= CONFIG['expiry_time'] * 60))  # Past timers not yet expired
                 ]
                 
-                logger.info(f"Found {len(upcoming_timers)} upcoming timers")
+                logger.info(f"Found {len(upcoming_timers)} upcoming/active timers")
                 
                 for timer in upcoming_timers:
                     time_until = (timer.time - now).total_seconds() / 60
@@ -124,7 +124,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     logger.info(f"  Already alerted start: {timer.timer_id in start_time_alerted}")
                     
                     # Alert at 60 minutes if not already alerted
-                    if 59.5 <= time_until <= 60.5:
+                    if 59.0 <= time_until <= 61.0:  # ±1 minute window for 60-minute alert
                         logger.info(f"  Timer is in 60-minute alert window ({time_until:.1f} minutes)")
                         if timer.timer_id not in sixty_min_alerted:
                             logger.info(f"  Sending 60-minute alert for timer {timer.timer_id}")
@@ -141,7 +141,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                             logger.info(f"  60-minute alert already sent for timer {timer.timer_id}")
                     
                     # Alert at start time if not already alerted
-                    elif -0.5 <= time_until <= 0.5:
+                    elif -1.0 <= time_until <= 1.0:  # ±1 minute window for start alert
                         logger.info(f"  Timer is in start alert window ({time_until:.1f} minutes)")
                         if timer.timer_id not in start_time_alerted:
                             logger.info(f"  Sending start alert for timer {timer.timer_id}")
