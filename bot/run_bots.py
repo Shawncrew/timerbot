@@ -9,7 +9,7 @@ from discord.ext import commands
 import datetime
 
 # Use relative imports since we're inside the bot package
-from bot.utils.config import load_config
+from bot.utils.config import load_config, CONFIG
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands

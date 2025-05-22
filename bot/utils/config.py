@@ -128,4 +128,5 @@ def load_config():
         return default_config
 
 # Load config at module level
-CONFIG = load_config() 
+CONFIG = load_config()
+__all__ = ['load_config', 'CONFIG']  # Export both functions 
