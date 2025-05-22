@@ -61,15 +61,26 @@ class Timer:
                 self.region = ""
 
     def to_string(self) -> str:
-        """Format timer for display"""
+        """Convert timer to string format for display"""
+        now = datetime.datetime.now(EVE_TZ)
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
-        # Make system name a clickable link
         system_link = f"[{self.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
-        region_str = f" ({self.region})" if self.region else ""
-        notes_str = f" {self.notes}" if self.notes else ""
         
-        return f"`{time_str}` {system_link}{region_str} - {self.structure_name}{notes_str} ({self.timer_id})"
+        # Check if timer is expired but not yet removed
+        is_expired = self.time < now
+        
+        # Format the base string
+        base_str = f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}"
+        if self.notes:
+            base_str += f" {self.notes}"
+        base_str += f" ({self.timer_id})"
+        
+        # Add strikethrough if expired
+        if is_expired:
+            base_str = f"~~{base_str}~~"
+            
+        return base_str
 
     def __str__(self) -> str:
         return self.to_string()
