@@ -309,6 +309,7 @@ class TimerBoard:
         expired = [t for t in self.timers if t.time < expiry_threshold]
         
         if expired:
+            # Remove expired timers from the list
             self.timers = [t for t in self.timers if t.time >= expiry_threshold]
             logger.info(f"Removing {len(expired)} expired timers:")
             for timer in expired:
@@ -316,7 +317,12 @@ class TimerBoard:
                 logger.info(f"    Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
                 if timer.notes:
                     logger.info(f"    Tags: {timer.notes}")
+            
+            # Save the updated timer list
             self.save_data()
+            
+            # Schedule an update of all timerboards
+            asyncio.create_task(self.update_all_timerboards())
         
         return expired
 
