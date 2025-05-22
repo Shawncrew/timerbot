@@ -90,6 +90,10 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 
                 # Get command channel for this server
                 cmd_channel = bot.get_channel(server_config['commands'])
+                if not cmd_channel:
+                    logger.error(f"Could not find commands channel for {server_name}")
+                    await asyncio.sleep(CONFIG['check_interval'])
+                    continue
                 
                 # Get all timers that are within the next hour
                 upcoming_timers = [
@@ -102,34 +106,48 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 
                 for timer in upcoming_timers:
                     time_until = (timer.time - now).total_seconds() / 60
-                    logger.info(f"Timer {timer.timer_id} is {time_until:.1f} minutes away")
+                    logger.info(f"Checking timer {timer.timer_id}:")
+                    logger.info(f"  System: {timer.system} ({timer.region})")
+                    logger.info(f"  Structure: {timer.structure_name}")
+                    logger.info(f"  Time until: {time_until:.1f} minutes")
+                    logger.info(f"  Already alerted 60min: {timer.timer_id in sixty_min_alerted}")
+                    logger.info(f"  Already alerted start: {timer.timer_id in start_time_alerted}")
                     
                     # Alert at 60 minutes if not already alerted
-                    if 59 <= time_until <= 60 and timer.timer_id not in sixty_min_alerted:
-                        logger.info(f"Timer {timer.timer_id} is at 60 minute mark")
-                        if cmd_channel:
+                    if 59.5 <= time_until <= 60.5:
+                        logger.info(f"  Timer is in 60-minute alert window ({time_until:.1f} minutes)")
+                        if timer.timer_id not in sixty_min_alerted:
+                            logger.info(f"  Sending 60-minute alert for timer {timer.timer_id}")
+                            clean_system = clean_system_name(timer.system)
+                            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
                             await cmd_channel.send(
-                                f"⚠️ Timer in 60 minutes: {timer.system} - {timer.structure_name} at {timer.time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {timer.timer_id})"
+                                f"⚠️ Timer in 60 minutes:\n"
+                                f"{system_link} ({timer.region}) - {timer.structure_name} {timer.notes}\n"
+                                f"Time: `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
                             )
                             sixty_min_alerted.add(timer.timer_id)
-                            logger.info(f"Added timer {timer.timer_id} to sixty_min_alerted")
+                            logger.info(f"  Added timer {timer.timer_id} to sixty_min_alerted")
+                        else:
+                            logger.info(f"  60-minute alert already sent for timer {timer.timer_id}")
                     
                     # Alert at start time if not already alerted
-                    elif -1 <= time_until <= 1 and timer.timer_id not in start_time_alerted:
-                        logger.info(f"Timer {timer.timer_id} is at start time (time_until={time_until:.1f})")
-                        if cmd_channel:
-                            logger.info(f"Sending start alert to #{cmd_channel.name}")
-                            try:
-                                await cmd_channel.send(
-                                    f"🚨 **TIMER STARTING NOW**: {timer.system} - {timer.structure_name} (ID: {timer.timer_id})"
-                                )
-                                logger.info(f"Successfully sent start alert for timer {timer.timer_id}")
-                                start_time_alerted.add(timer.timer_id)
-                                logger.info(f"Added timer {timer.timer_id} to start_time_alerted")
-                            except Exception as e:
-                                logger.error(f"Failed to send start alert: {e}")
+                    elif -0.5 <= time_until <= 0.5:
+                        logger.info(f"  Timer is in start alert window ({time_until:.1f} minutes)")
+                        if timer.timer_id not in start_time_alerted:
+                            logger.info(f"  Sending start alert for timer {timer.timer_id}")
+                            clean_system = clean_system_name(timer.system)
+                            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                            await cmd_channel.send(
+                                f"🚨 **TIMER STARTING NOW**:\n"
+                                f"{system_link} ({timer.region}) - {timer.structure_name} {timer.notes}\n"
+                                f"Time: `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})"
+                            )
+                            start_time_alerted.add(timer.timer_id)
+                            logger.info(f"  Added timer {timer.timer_id} to start_time_alerted")
                         else:
-                            logger.error(f"Could not find commands channel for {server_name}")
+                            logger.info(f"  Start alert already sent for timer {timer.timer_id}")
+                    else:
+                        logger.info(f"  Timer not in any alert window")
                 
                 # Clean up expired timers from both alert sets
                 expired = shared_timerboard.remove_expired()
@@ -146,6 +164,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 
             except Exception as e:
                 logger.error(f"Error in timer check loop for {server_name}: {e}")
+                logger.exception("Full traceback:")
                 await asyncio.sleep(CONFIG['check_interval'])
     
     try:
