@@ -386,26 +386,52 @@ class TimerBoard:
                     timer_list.append(timer.to_string())
                     logger.info(f"Added timer to list: {timer}")
                 
-                # Combine all parts
-                message = header + "\n".join(timer_list) if timer_list else header + "No active timers."
+                # Split into multiple messages if needed
+                messages = []
+                current_message = header
                 
-                # Find and update the most recent bot message
-                most_recent_msg = None
+                for timer_str in timer_list:
+                    # Check if adding this timer would exceed the limit
+                    if len(current_message) + len(timer_str) + 1 > self.MAX_MESSAGE_LENGTH:
+                        # Current message is full, start a new one
+                        messages.append(current_message.strip())
+                        current_message = timer_str + "\n"
+                    else:
+                        # Add to current message
+                        current_message += timer_str + "\n"
+                
+                # Add the last message if it has content
+                if current_message.strip() and current_message.strip() != header.strip():
+                    messages.append(current_message.strip())
+                
+                # If no timers, create a single message
+                if not timer_list:
+                    messages = [header + "No active timers."]
+                
+                # Find existing bot messages
+                existing_messages = []
                 async for msg in channel.history(limit=100):
                     if msg.author == channel.guild.me:
-                        most_recent_msg = msg
-                        break
+                        existing_messages.append(msg)
+                existing_messages.reverse()  # Oldest first
                 
-                if most_recent_msg:
-                    logger.info(f"Found existing message in {channel.guild.name}, updating...")
-                    logger.info(f"Old content:\n{most_recent_msg.content}")
-                    logger.info(f"New content:\n{message}")
-                    await most_recent_msg.edit(content=message)
-                    logger.info(f"Successfully updated timerboard in {channel.guild.name}")
-                else:
-                    logger.info(f"No existing message found in {channel.guild.name}, creating new...")
-                    await channel.send(message)
-                    logger.info(f"Successfully created new timerboard in {channel.guild.name}")
+                # Update or create messages
+                for i, content in enumerate(messages):
+                    if i < len(existing_messages):
+                        # Update existing message
+                        logger.info(f"Updating message {i+1} in {channel.guild.name}")
+                        await existing_messages[i].edit(content=content)
+                    else:
+                        # Create new message
+                        logger.info(f"Creating new message {i+1} in {channel.guild.name}")
+                        await channel.send(content)
+                
+                # Delete any extra messages
+                for message in existing_messages[len(messages):]:
+                    logger.info(f"Deleting extra message in {channel.guild.name}")
+                    await message.delete()
+                    
+                logger.info(f"Successfully updated timerboard in {channel.guild.name} with {len(messages)} messages")
                     
             except Exception as e:
                 logger.error(f"Error updating timerboard in {channel.guild.name}: {e}")
