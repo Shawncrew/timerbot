@@ -28,6 +28,31 @@ STRUCTURE_TAGS = {
     'IHUB': 'IHUB',
 }
 
+def parse_timer_message(content):
+    """Parse structure type, structure name, system, timer type, and timer time from a timer notification message."""
+    # Structure type: after 'The ' and before first bold
+    struct_type_match = re.search(r'The ([^*\n]+)', content)
+    structure_type = struct_type_match.group(1).strip() if struct_type_match else None
+    # Structure name: first bold after structure type
+    struct_name_match = re.search(r'The [^*\n]+\*\*([^*\n]+)\*\* in', content)
+    structure_name = struct_name_match.group(1).strip() if struct_name_match else None
+    # System: first [SYSTEM] markdown link after 'in'
+    system_match = re.search(r'in \[([A-Z0-9-]+)\]', content)
+    system = system_match.group(1).strip() if system_match else None
+    # Timer type and time
+    timer_type = None
+    timer_time = None
+    if 'Hull timer end at:' in content:
+        timer_type = 'HULL'
+        timer_time_match = re.search(r'Hull timer end at: \*\*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*\*', content)
+    elif 'Armor timer end at:' in content:
+        timer_type = 'ARMOR'
+        timer_time_match = re.search(r'Armor timer end at: \*\*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*\*', content)
+    else:
+        timer_time_match = None
+    timer_time_str = timer_time_match.group(1).strip() if timer_time_match else None
+    return structure_type, structure_name, system, timer_type, timer_time_str
+
 class TimerCommands(commands.GroupCog, name="timer"):
     def __init__(self, bot, timerboard):
         self.bot = bot
@@ -266,57 +291,40 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                         logger.info(f"[LIVE] Extracted embed content: {content}")
                     # Detect shield or armor loss
                     if ("Structure lost shield" in content or "Structure lost armor" in content):
-                        # Extract structure type
-                        struct_match = re.search(r"The ([^\n]+?) in ([A-Z0-9-]+) ", content)
-                        if not struct_match:
-                            logger.warning(f"Could not parse structure/system from: {content}")
+                        # Use improved parsing
+                        structure_type, structure_name, system, timer_type, timer_time_str = parse_timer_message(content)
+                        logger.info(f"[LIVE] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}")
+                        if not (structure_type and structure_name and system and timer_type and timer_time_str):
+                            logger.warning(f"[LIVE] Failed to parse all fields. Message: {content}")
                             return
-                        structure_raw = struct_match.group(1).strip()
-                        system = struct_match.group(2).strip()
-                        # Normalize structure type for tag
+                        # Structure tag
                         structure_tag = None
                         for key in STRUCTURE_TAGS:
-                            if key in structure_raw.upper():
+                            if key in structure_type.upper():
                                 structure_tag = STRUCTURE_TAGS[key]
                                 break
                         if not structure_tag:
-                            structure_tag = structure_raw.upper().split()[0]  # fallback to first word
-                        # Timer type and time
-                        timer_type = None
-                        timer_time = None
-                        if "Armor timer end at:" in content:
-                            timer_type = "ARMOR"
-                            timer_time_match = re.search(r"Armor timer end at: ([0-9\-: ]+)", content)
-                        elif "Hull timer end at:" in content:
-                            timer_type = "HULL"
-                            timer_time_match = re.search(r"Hull timer end at: ([0-9\-: ]+)", content)
-                        else:
-                            logger.warning(f"No timer end found in: {content}")
-                            return
-                        if timer_time_match:
-                            timer_time_str = timer_time_match.group(1).strip()
-                            try:
-                                timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
-                                timer_time = EVE_TZ.localize(timer_time)
-                            except Exception as e:
-                                logger.warning(f"Could not parse timer time: {timer_time_str}")
-                                return
-                        else:
-                            logger.warning(f"Could not find timer time in: {content}")
+                            structure_tag = structure_type.upper().split()[0]  # fallback
+                        # Parse time
+                        try:
+                            timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                            timer_time = EVE_TZ.localize(timer_time)
+                        except Exception as e:
+                            logger.warning(f"[LIVE] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                             return
                         # Build tags
                         tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
-                        # Compose description
-                        description = f"{system} - {structure_raw} {tags}"
+                        description = f"{system} - {structure_name} {tags}"
                         # Add timer
                         new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
                         # Notify command channel
                         cmd_channel = self.bot.get_channel(server_config['commands'])
                         if cmd_channel:
                             await cmd_channel.send(
-                                f"✅ Auto-added timer: {system} - {structure_raw} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})"
+                                f"✅ Auto-added timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})"
                             )
                         logger.info(f"Auto-added timer from citadel-attacked: {description}")
+                        return
                     break
         except Exception as e:
             logger.error(f"Error processing citadel-attacked message: {e}")
@@ -471,60 +479,38 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
             logger.info(f"[BACKFILL] Extracted embed content: {content}")
         logger.info(f"[BACKFILL] Considering message: {content}")
         if ("Structure lost shield" in content or "Structure lost armor" in content):
-            # Extract structure type
-            struct_match = re.search(r"The ([^\n]+?) in ([A-Z0-9-]+) ", content)
-            if not struct_match:
-                logger.warning(f"[BACKFILL] Regex failed to match structure/system. Message: {content}")
+            # Use improved parsing
+            structure_type, structure_name, system, timer_type, timer_time_str = parse_timer_message(content)
+            logger.info(f"[BACKFILL] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}")
+            if not (structure_type and structure_name and system and timer_type and timer_time_str):
+                logger.warning(f"[BACKFILL] Failed to parse all fields. Message: {content}")
                 failed += 1
                 continue
-            structure_raw = struct_match.group(1).strip()
-            system = struct_match.group(2).strip()
-            logger.info(f"[BACKFILL] Extracted structure: '{structure_raw}', system: '{system}'")
-            # Normalize structure type for tag
+            # Structure tag
             structure_tag = None
             for key in STRUCTURE_TAGS:
-                if key in structure_raw.upper():
+                if key in structure_type.upper():
                     structure_tag = STRUCTURE_TAGS[key]
                     break
             if not structure_tag:
-                structure_tag = structure_raw.upper().split()[0]  # fallback to first word
-            # Timer type and time
-            timer_type = None
-            timer_time = None
-            if "Armor timer end at:" in content:
-                timer_type = "ARMOR"
-                timer_time_match = re.search(r"Armor timer end at: ([0-9\-: ]+)", content)
-            elif "Hull timer end at:" in content:
-                timer_type = "HULL"
-                timer_time_match = re.search(r"Hull timer end at: ([0-9\-: ]+)", content)
-            else:
-                logger.warning(f"[BACKFILL] No timer end found in message: {content}")
-                failed += 1
-                continue
-            if timer_time_match:
-                timer_time_str = timer_time_match.group(1).strip()
-                try:
-                    timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
-                    timer_time = EVE_TZ.localize(timer_time)
-                    logger.info(f"[BACKFILL] Parsed timer time: {timer_time_str}")
-                except Exception as e:
-                    logger.warning(f"[BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
-                    failed += 1
-                    continue
-            else:
-                logger.warning(f"[BACKFILL] Could not find timer time in message: {content}")
+                structure_tag = structure_type.upper().split()[0]  # fallback
+            # Parse time
+            try:
+                timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                timer_time = EVE_TZ.localize(timer_time)
+            except Exception as e:
+                logger.warning(f"[BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                 failed += 1
                 continue
             # Build tags
             tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
-            # Compose description
-            description = f"{system} - {structure_raw} {tags}"
+            description = f"{system} - {structure_name} {tags}"
             # Check for duplicate
             duplicate = False
             for t in timerboard.timers:
                 if (
                     t.system.upper() == system.upper()
-                    and t.structure_name.upper() == structure_raw.upper()
+                    and t.structure_name.upper() == structure_name.upper()
                     and abs((t.time - timer_time).total_seconds()) < 60
                 ):
                     duplicate = True
@@ -538,7 +524,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 new_timer, _ = await timerboard.add_timer(timer_time, description)
                 logger.info(f"[BACKFILL] Added timer: {description} at {timer_time}")
                 added += 1
-                details.append(f"{system} - {structure_raw} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
+                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
             except Exception as e:
                 logger.warning(f"[BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                 failed += 1
