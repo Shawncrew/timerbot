@@ -320,8 +320,9 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                         # Notify command channel
                         cmd_channel = self.bot.get_channel(server_config['commands'])
                         if cmd_channel:
+                            add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
                             await cmd_channel.send(
-                                f"✅ Auto-added timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})"
+                                f"✅ Auto-added timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
                             )
                         logger.info(f"Auto-added timer from citadel-attacked: {description}")
                         return
@@ -529,7 +530,8 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 new_timer, _ = await timerboard.add_timer(timer_time, description)
                 logger.info(f"[BACKFILL] Added timer: {description} at {timer_time}")
                 added += 1
-                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
+                add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
             except Exception as e:
                 logger.warning(f"[BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                 failed += 1
