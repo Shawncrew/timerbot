@@ -9,6 +9,24 @@ from discord import app_commands
 from discord import Interaction
 import discord
 
+# Structure mapping for tags
+STRUCTURE_TAGS = {
+    'KEEPSTAR': 'KEEPSTAR',
+    'FORTIZAR': 'FORTIZAR',
+    'AZBEL': 'AZBEL',
+    'TATARA': 'TATARA',
+    'ASTRAHUS': 'ASTRAHUS',
+    'ATHANOR': 'ATHANOR',
+    'RAITARU': 'RAITARU',
+    'SOTIYO': 'SOTIYO',
+    'ANSIBLEX': 'ANSI',
+    'CYNO BEACON': 'CYNO BEACON',
+    'CYNO JAMMER': 'CYNO JAMMER',
+    'SKYHOOK': 'SKYHOOK',
+    'METENOX': 'METENOX',
+    'IHUB': 'IHUB',
+}
+
 class TimerCommands(commands.GroupCog, name="timer"):
     def __init__(self, bot, timerboard):
         self.bot = bot
@@ -227,24 +245,68 @@ Note: Medium structures should use "HULL" since there is only one timer."""
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Monitor citadel channels for structure messages"""
+        """Monitor citadel channels for structure messages and auto-add timers"""
         try:
-            # Check if this is one of our monitored channels
+            # Only process messages from configured citadel_attacked channels
             for server_config in CONFIG['servers'].values():
-                if message.channel.id in [
-                    server_config.get('citadel_attacked'),
-                    server_config.get('citadel_info')
-                ]:
-                    if (message.channel.id == server_config.get('citadel_attacked') and 
-                        message.content.startswith('Structure lost armor')):
-                        await self.handle_armor_loss(message)
-                    elif (message.channel.id == server_config.get('citadel_info') and 
-                          message.content.startswith('Structure full power')):
-                        await self.handle_structure_repair(message)
+                if message.channel.id == server_config.get('citadel_attacked'):
+                    content = message.content
+                    # Detect shield or armor loss
+                    if ("Structure lost shield" in content or "Structure lost armor" in content):
+                        # Extract structure type
+                        struct_match = re.search(r"The ([^\n]+?) in ([A-Z0-9-]+) ", content)
+                        if not struct_match:
+                            logger.warning(f"Could not parse structure/system from: {content}")
+                            return
+                        structure_raw = struct_match.group(1).strip()
+                        system = struct_match.group(2).strip()
+                        # Normalize structure type for tag
+                        structure_tag = None
+                        for key in STRUCTURE_TAGS:
+                            if key in structure_raw.upper():
+                                structure_tag = STRUCTURE_TAGS[key]
+                                break
+                        if not structure_tag:
+                            structure_tag = structure_raw.upper().split()[0]  # fallback to first word
+                        # Timer type and time
+                        timer_type = None
+                        timer_time = None
+                        if "Armor timer end at:" in content:
+                            timer_type = "ARMOR"
+                            timer_time_match = re.search(r"Armor timer end at: ([0-9\-: ]+)", content)
+                        elif "Hull timer end at:" in content:
+                            timer_type = "HULL"
+                            timer_time_match = re.search(r"Hull timer end at: ([0-9\-: ]+)", content)
+                        else:
+                            logger.warning(f"No timer end found in: {content}")
+                            return
+                        if timer_time_match:
+                            timer_time_str = timer_time_match.group(1).strip()
+                            try:
+                                timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                                timer_time = EVE_TZ.localize(timer_time)
+                            except Exception as e:
+                                logger.warning(f"Could not parse timer time: {timer_time_str}")
+                                return
+                        else:
+                            logger.warning(f"Could not find timer time in: {content}")
+                            return
+                        # Build tags
+                        tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
+                        # Compose description
+                        description = f"{system} - {structure_raw} {tags}"
+                        # Add timer
+                        new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                        # Notify command channel
+                        cmd_channel = self.bot.get_channel(server_config['commands'])
+                        if cmd_channel:
+                            await cmd_channel.send(
+                                f"✅ Auto-added timer: {system} - {structure_raw} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})"
+                            )
+                        logger.info(f"Auto-added timer from citadel-attacked: {description}")
                     break
-
         except Exception as e:
-            logger.error(f"Error processing structure message: {e}")
+            logger.error(f"Error processing citadel-attacked message: {e}")
 
     async def handle_armor_loss(self, message):
         """Handle armor loss messages and add timers"""
