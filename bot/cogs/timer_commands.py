@@ -430,6 +430,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
     channel_id = server_config.get('citadel_attacked')
     cmd_channel_id = server_config.get('commands')
     if not channel_id:
+        logger.info("No citadel_attacked channel configured for backfill.")
         return
     channel = bot.get_channel(channel_id)
     cmd_channel = bot.get_channel(cmd_channel_id)
@@ -444,14 +445,17 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
     details = []
     async for message in channel.history(limit=1000, after=five_days_ago):
         content = message.content
+        logger.info(f"[BACKFILL] Considering message: {content}")
         if ("Structure lost shield" in content or "Structure lost armor" in content):
             # Extract structure type
             struct_match = re.search(r"The ([^\n]+?) in ([A-Z0-9-]+) ", content)
             if not struct_match:
+                logger.warning(f"[BACKFILL] Regex failed to match structure/system. Message: {content}")
                 failed += 1
                 continue
             structure_raw = struct_match.group(1).strip()
             system = struct_match.group(2).strip()
+            logger.info(f"[BACKFILL] Extracted structure: '{structure_raw}', system: '{system}'")
             # Normalize structure type for tag
             structure_tag = None
             for key in STRUCTURE_TAGS:
@@ -470,6 +474,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 timer_type = "HULL"
                 timer_time_match = re.search(r"Hull timer end at: ([0-9\-: ]+)", content)
             else:
+                logger.warning(f"[BACKFILL] No timer end found in message: {content}")
                 failed += 1
                 continue
             if timer_time_match:
@@ -477,10 +482,13 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 try:
                     timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
                     timer_time = EVE_TZ.localize(timer_time)
+                    logger.info(f"[BACKFILL] Parsed timer time: {timer_time_str}")
                 except Exception as e:
+                    logger.warning(f"[BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                     failed += 1
                     continue
             else:
+                logger.warning(f"[BACKFILL] Could not find timer time in message: {content}")
                 failed += 1
                 continue
             # Build tags
@@ -498,16 +506,21 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                     duplicate = True
                     break
             if duplicate:
+                logger.info(f"[BACKFILL] Skipping duplicate: {description} at {timer_time}")
                 already += 1
                 continue
             # Add timer
             try:
                 new_timer, _ = await timerboard.add_timer(timer_time, description)
+                logger.info(f"[BACKFILL] Added timer: {description} at {timer_time}")
                 added += 1
                 details.append(f"{system} - {structure_raw} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
             except Exception as e:
+                logger.warning(f"[BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                 failed += 1
                 continue
+        else:
+            logger.info(f"[BACKFILL] Message does not contain relevant keywords. Skipping.")
     # Send summary
     if cmd_channel:
         summary = (
