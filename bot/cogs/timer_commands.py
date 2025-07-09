@@ -502,6 +502,11 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 logger.warning(f"[BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                 failed += 1
                 continue
+            # Skip expired timers
+            now_utc = datetime.datetime.now(EVE_TZ)
+            if timer_time < now_utc:
+                logger.info(f"[BACKFILL] Skipping expired timer: {system} - {structure_name} at {timer_time}")
+                continue
             # Build tags
             tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
             description = f"{system} - {structure_name} {tags}"
