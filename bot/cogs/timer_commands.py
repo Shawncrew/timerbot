@@ -327,6 +327,49 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                         logger.info(f"Auto-added timer from citadel-attacked: {description}")
                         return
                     break
+                # --- New sov channel logic ---
+                if message.channel.id == server_config.get('sov'):
+                    content = message.content
+                    # If content is empty or doesn't contain keywords, try to extract from embed
+                    if (not content or "Infrastructure Hub" not in content) and message.embeds:
+                        embed = message.embeds[0]
+                        embed_text = []
+                        if embed.title:
+                            embed_text.append(embed.title)
+                        if embed.description:
+                            embed_text.append(embed.description)
+                        for field in getattr(embed, 'fields', []):
+                            embed_text.append(f"{field.name} {field.value}")
+                        content = "\n".join(embed_text)
+                        logger.info(f"[SOV] Extracted embed content: {content}")
+                    # Look for Infrastructure Hub reinforced pattern
+                    match = re.search(r'Infrastructure Hub in ([A-Z0-9-]+) has entered reinforced mode', content)
+                    if match:
+                        system = match.group(1)
+                        # Try to extract timer from embed (look for datetime in content)
+                        timer_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content)
+                        if timer_match:
+                            timer_time_str = timer_match.group(1)
+                            try:
+                                timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                                timer_time = EVE_TZ.localize(timer_time)
+                            except Exception as e:
+                                logger.warning(f"[SOV] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                                return
+                            tags = "[NC][IHUB]"
+                            description = f"{system} - Infrastructure Hub {tags}"
+                            new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                            # Notify command channel
+                            cmd_channel = self.bot.get_channel(server_config['commands'])
+                            if cmd_channel:
+                                add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
+                                await cmd_channel.send(
+                                    f"✅ Auto-added SOV timer: {system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
+                                )
+                            logger.info(f"Auto-added timer from SOV: {description}")
+                        else:
+                            logger.warning(f"[SOV] Could not find timer time in message: {content}")
+                    break
         except Exception as e:
             logger.error(f"Error processing citadel-attacked message: {e}")
 
