@@ -8,6 +8,7 @@ from bot.utils.config import CONFIG
 from discord import app_commands
 from discord import Interaction
 import discord
+import pytz
 
 # Structure mapping for tags
 STRUCTURE_TAGS = {
@@ -423,3 +424,96 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             
         except Exception as e:
             logger.error(f"Error processing structure repair message: {e}") 
+
+async def backfill_citadel_timers(bot, timerboard, server_config):
+    """Backfill timers from the last 5 days of citadel-attacked channel messages."""
+    channel_id = server_config.get('citadel_attacked')
+    cmd_channel_id = server_config.get('commands')
+    if not channel_id:
+        return
+    channel = bot.get_channel(channel_id)
+    cmd_channel = bot.get_channel(cmd_channel_id)
+    if not channel:
+        logger.warning(f"Could not find citadel_attacked channel for backfill.")
+        return
+    now = datetime.datetime.now(pytz.UTC)
+    five_days_ago = now - datetime.timedelta(days=5)
+    added = 0
+    already = 0
+    failed = 0
+    details = []
+    async for message in channel.history(limit=1000, after=five_days_ago):
+        content = message.content
+        if ("Structure lost shield" in content or "Structure lost armor" in content):
+            # Extract structure type
+            struct_match = re.search(r"The ([^\n]+?) in ([A-Z0-9-]+) ", content)
+            if not struct_match:
+                failed += 1
+                continue
+            structure_raw = struct_match.group(1).strip()
+            system = struct_match.group(2).strip()
+            # Normalize structure type for tag
+            structure_tag = None
+            for key in STRUCTURE_TAGS:
+                if key in structure_raw.upper():
+                    structure_tag = STRUCTURE_TAGS[key]
+                    break
+            if not structure_tag:
+                structure_tag = structure_raw.upper().split()[0]  # fallback to first word
+            # Timer type and time
+            timer_type = None
+            timer_time = None
+            if "Armor timer end at:" in content:
+                timer_type = "ARMOR"
+                timer_time_match = re.search(r"Armor timer end at: ([0-9\-: ]+)", content)
+            elif "Hull timer end at:" in content:
+                timer_type = "HULL"
+                timer_time_match = re.search(r"Hull timer end at: ([0-9\-: ]+)", content)
+            else:
+                failed += 1
+                continue
+            if timer_time_match:
+                timer_time_str = timer_time_match.group(1).strip()
+                try:
+                    timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                    timer_time = EVE_TZ.localize(timer_time)
+                except Exception as e:
+                    failed += 1
+                    continue
+            else:
+                failed += 1
+                continue
+            # Build tags
+            tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
+            # Compose description
+            description = f"{system} - {structure_raw} {tags}"
+            # Check for duplicate
+            duplicate = False
+            for t in timerboard.timers:
+                if (
+                    t.system.upper() == system.upper()
+                    and t.structure_name.upper() == structure_raw.upper()
+                    and abs((t.time - timer_time).total_seconds()) < 60
+                ):
+                    duplicate = True
+                    break
+            if duplicate:
+                already += 1
+                continue
+            # Add timer
+            try:
+                new_timer, _ = await timerboard.add_timer(timer_time, description)
+                added += 1
+                details.append(f"{system} - {structure_raw} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
+            except Exception as e:
+                failed += 1
+                continue
+    # Send summary
+    if cmd_channel:
+        summary = (
+            f"Backfill complete: {added} timers added, {already} already present, {failed} failed."
+        )
+        if added > 0:
+            summary += "\nAdded timers:\n" + "\n".join(details)
+        await cmd_channel.send(summary)
+    logger.info(f"Backfill summary: {added} added, {already} already present, {failed} failed.") 

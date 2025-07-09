@@ -12,7 +12,7 @@ import datetime
 from bot.utils.config import load_config, CONFIG
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
-from bot.cogs.timer_commands import TimerCommands
+from bot.cogs.timer_commands import TimerCommands, backfill_citadel_timers
 from bot.utils.helpers import clean_system_name
 
 async def run_bot_instance(server_name, server_config, shared_timerboard):
@@ -38,6 +38,10 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             
             # Register this bot with the timerboard
             shared_timerboard.register_bot(bot, server_config)
+            
+            # Backfill timers from citadel-attacked channel
+            logger.info(f"Starting backfill for {server_name}")
+            await backfill_citadel_timers(bot, shared_timerboard, server_config)
             
             # Initial timerboard update
             logger.info(f"Performing initial timerboard update for {server_name}")
