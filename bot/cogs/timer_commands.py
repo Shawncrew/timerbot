@@ -252,6 +252,18 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             for server_config in CONFIG['servers'].values():
                 if message.channel.id == server_config.get('citadel_attacked'):
                     content = message.content
+                    # If content is empty or doesn't contain keywords, try to extract from embed
+                    if (not content or ("Structure lost shield" not in content and "Structure lost armor" not in content)) and message.embeds:
+                        embed = message.embeds[0]
+                        embed_text = []
+                        if embed.title:
+                            embed_text.append(embed.title)
+                        if embed.description:
+                            embed_text.append(embed.description)
+                        for field in getattr(embed, 'fields', []):
+                            embed_text.append(f"{field.name} {field.value}")
+                        content = "\n".join(embed_text)
+                        logger.info(f"[LIVE] Extracted embed content: {content}")
                     # Detect shield or armor loss
                     if ("Structure lost shield" in content or "Structure lost armor" in content):
                         # Extract structure type
@@ -445,6 +457,18 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
     details = []
     async for message in channel.history(limit=1000, after=five_days_ago):
         content = message.content
+        # If content is empty or doesn't contain keywords, try to extract from embed
+        if (not content or ("Structure lost shield" not in content and "Structure lost armor" not in content)) and message.embeds:
+            embed = message.embeds[0]
+            embed_text = []
+            if embed.title:
+                embed_text.append(embed.title)
+            if embed.description:
+                embed_text.append(embed.description)
+            for field in getattr(embed, 'fields', []):
+                embed_text.append(f"{field.name} {field.value}")
+            content = "\n".join(embed_text)
+            logger.info(f"[BACKFILL] Extracted embed content: {content}")
         logger.info(f"[BACKFILL] Considering message: {content}")
         if ("Structure lost shield" in content or "Structure lost armor" in content):
             # Extract structure type
