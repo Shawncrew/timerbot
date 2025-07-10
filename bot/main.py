@@ -190,7 +190,15 @@ async def on_ready():
         
         # Debug channel information
         logger.info("Checking channels...")
-        
+
+        # List all text channels the bot can see in each guild
+        for guild in bot.guilds:
+            logger.info(f"Guild: {guild.name} (ID: {guild.id}) - Listing all text channels:")
+            for channel in guild.text_channels:
+                logger.info(f"  TextChannel: #{channel.name} (ID: {channel.id})")
+                perms = channel.permissions_for(guild.me)
+                logger.info(f"    Can view: {perms.view_channel}, Can send: {perms.send_messages}, Can read: {perms.read_messages}")
+
         # Check channels for each server
         for server_name, server_config in CONFIG['servers'].items():
             logger.info(f"Checking channels for {server_name}:")
