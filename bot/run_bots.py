@@ -13,7 +13,16 @@ from bot.utils.config import load_config, CONFIG
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands, backfill_citadel_timers
+from bot.cogs.timer_commands import backfill_sov_timers
 from bot.utils.helpers import clean_system_name
+
+print('NC Timerbot: run_bots.py loaded and running!')
+logger.info("""
+=====================================
+         NC Timerbot
+   EVE Online Timer Discord Bot
+=====================================
+""")
 
 async def run_bot_instance(server_name, server_config, shared_timerboard):
     """Run a single bot instance for a server"""
@@ -26,6 +35,11 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     @bot.event
     async def on_ready():
         try:
+            logger.info("""
+====================================================
+   TIMERBOT IS ONLINE AND READY!
+====================================================
+""")
             logger.info(f"Bot {server_name} connected as {bot.user}")
             logger.info(f"Bot application ID: {bot.user.id}")
             
@@ -35,6 +49,29 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 logger.info(f"  Guild: {guild.name} (ID: {guild.id})")
                 logger.info(f"  Is bot connected: {guild.me and guild.me.status}")
                 logger.info(f"  Bot roles: {[role.name for role in guild.me.roles if guild.me]}")
+                logger.info(f"Guild: {guild.name} (ID: {guild.id}) - Listing all text channels:")
+                for channel in guild.text_channels:
+                    logger.info(f"  TextChannel: #{channel.name} (ID: {channel.id})")
+                    perms = channel.permissions_for(guild.me)
+                    logger.info(f"    Can view: {perms.view_channel}, Can send: {perms.send_messages}, Can read: {perms.read_messages}")
+
+            # Check and log all configured channels, including sov
+            for channel_name, channel_id in server_config.items():
+                if isinstance(channel_id, int):
+                    channel = bot.get_channel(channel_id)
+                    if channel:
+                        logger.info(f"Found channel '{channel_name}' in {server_name} with ID: {channel_id}")
+                    else:
+                        logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id}) for {server_name}")
+
+            logger.info("""
+====================================================
+   STARTING SOV BACKFILL FOR THIS SERVER
+====================================================
+""")
+            if server_config.get('sov'):
+                logger.info(f"Running SOV backfill for {server_name}...")
+                await backfill_sov_timers(bot, shared_timerboard, server_config)
             
             # Register this bot with the timerboard
             shared_timerboard.register_bot(bot, server_config)
