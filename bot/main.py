@@ -311,4 +311,5 @@ def run_bot():
         logger.error(f"Error running bot: {e}")
 
 if __name__ == "__main__":
+    print('NC Timerbot: main.py loaded and running!')
     run_bot() 
