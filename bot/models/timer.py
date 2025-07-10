@@ -66,20 +66,19 @@ class Timer:
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
         system_link = f"[{self.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
-        
-        # Check if timer is expired but not yet removed
         is_expired = self.time < now
-        
-        # Format the base string
-        base_str = f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}"
-        if self.notes:
-            base_str += f" {self.notes}"
-        base_str += f" ({self.timer_id})"
-        
-        # Add strikethrough if expired
+
+        # If this is an IHUB timer and the description contains the shield emoji, use the description directly
+        if '[IHUB]' in self.description and '🛡️' in self.description:
+            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.description} ({self.timer_id})"
+        else:
+            # Format the base string as before
+            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}"
+            if self.notes:
+                base_str += f" {self.notes}"
+            base_str += f" ({self.timer_id})"
         if is_expired:
             base_str = f"~~{base_str}~~"
-            
         return base_str
 
     def __str__(self) -> str:
