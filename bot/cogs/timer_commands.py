@@ -28,6 +28,9 @@ STRUCTURE_TAGS = {
     'IHUB': 'IHUB',
 }
 
+# Define regions for alert
+ALERT_REGIONS = {"THE SPIRE", "MALPAIS", "OUTER PASSAGE", "OASA", "ETHERIUM REACH"}
+
 def parse_timer_message(content):
     """Parse structure type, structure name, system, timer type, and timer time from a timer notification message."""
     # Structure type: after 'The ' and before first bold
@@ -350,31 +353,22 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     if match:
                         system = match.group(1)
                         logger.info(f"[SOV] Matched system: {system}")
-                        # Try to extract timer from embed (look for datetime in content)
-                        timer_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content)
-                        if timer_match:
-                            timer_time_str = timer_match.group(1)
-                            logger.info(f"[SOV] Matched timer time: {timer_time_str}")
-                            try:
-                                timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
-                                timer_time = EVE_TZ.localize(timer_time)
-                            except Exception as e:
-                                logger.warning(f"[SOV] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
-                                return
-                            tags = "[NC][IHUB]"
-                            description = f"{system} - Infrastructure Hub {tags}"
-                            new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
-                            logger.info(f"[SOV] Added timer: {description} at {timer_time}")
-                            # Notify command channel
-                            cmd_channel = self.bot.get_channel(server_config['commands'])
-                            if cmd_channel:
-                                add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
-                                await cmd_channel.send(
-                                    f"✅ Auto-added SOV timer: {system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
-                                )
-                            logger.info(f"Auto-added timer from SOV: {description}")
-                        else:
-                            logger.warning(f"[SOV] Could not find timer time in message: {content}")
+                        # Try to get region from content (look for parenthesis after system link)
+                        region_match = re.search(r'\[' + re.escape(system) + r'\][^\n]*?\(([^)]+)\)', content)
+                        region = region_match.group(1).strip().upper() if region_match else None
+                        alert_emoji = " 🚨" if region and region in ALERT_REGIONS else ""
+                        tags = f"[NC][IHUB] 🛡️{alert_emoji}"
+                        description = f"{system} - Infrastructure Hub {tags}"
+                        new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                        logger.info(f"[SOV] Added timer: {description} at {timer_time}")
+                        # Notify command channel
+                        cmd_channel = self.bot.get_channel(server_config['commands'])
+                        if cmd_channel:
+                            add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
+                            await cmd_channel.send(
+                                f"✅ Auto-added SOV timer: {system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
+                            )
+                        logger.info(f"Auto-added timer from SOV: {description}")
                     else:
                         logger.info(f"[SOV] No match for Infrastructure Hub reinforced pattern in content: {content}")
                     break
@@ -654,7 +648,11 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                 if timer_time < now_utc:
                     logger.info(f"[SOV-BACKFILL] Skipping expired timer: {system} - Infrastructure Hub at {timer_time}")
                     continue
-                tags = "[NC][IHUB]"
+                # Try to get region from content (look for parenthesis after system link)
+                region_match = re.search(r'\[' + re.escape(system) + r'\][^\n]*?\(([^)]+)\)', content)
+                region = region_match.group(1).strip().upper() if region_match else None
+                alert_emoji = " 🚨" if region and region in ALERT_REGIONS else ""
+                tags = f"[NC][IHUB] 🛡️{alert_emoji}"
                 description = f"{system} - Infrastructure Hub {tags}"
                 # Check for duplicate
                 duplicate = False
