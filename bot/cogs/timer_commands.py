@@ -75,6 +75,12 @@ def parse_timer_message(content):
     alliance = alliance_match.group(1).strip() if alliance_match else None
     return structure_type, structure_name, system, timer_type, timer_time_str, alliance
 
+def extract_ticker_from_message(content):
+    """Return [WA] if 'Weaponised Holdings.' in content, else [NC]."""
+    if 'Weaponised Holdings.' in content:
+        return '[WA]'
+    return '[NC]'
+
 class TimerCommands(commands.GroupCog, name="timer"):
     def __init__(self, bot, timerboard):
         self.bot = bot
@@ -335,7 +341,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             logger.warning(f"[LIVE] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                             return
                         # Build tags
-                        tags = f"{extract_ticker(alliance)}[{structure_tag.upper()}][{timer_type.upper()}]"
+                        tags = f"{extract_ticker_from_message(content)}[{structure_tag.upper()}][{timer_type.upper()}]"
                         description = f"{system} - {structure_name} {tags}"
                         # Add timer
                         new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
@@ -573,7 +579,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 logger.info(f"[BACKFILL] Skipping expired timer: {system} - {structure_name} at {timer_time}")
                 continue
             # Build tags
-            tags = f"{extract_ticker(alliance)}[{structure_tag.upper()}][{timer_type.upper()}]"
+            tags = f"{extract_ticker_from_message(content)}[{structure_tag.upper()}][{timer_type.upper()}]"
             description = f"{system} - {structure_name} {tags}"
             # Check for duplicate
             duplicate = False
