@@ -345,8 +345,8 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                         logger.info(f"[SOV] Extracted embed content: {content}")
                     else:
                         logger.info(f"[SOV] Using message content for parsing: {content}")
-                    # Look for Infrastructure Hub reinforced pattern
-                    match = re.search(r'Infrastructure Hub in ([A-Z0-9-]+) has entered reinforced mode', content)
+                    # Improved regex: match both Markdown and plain text, and 'has been reinforced'
+                    match = re.search(r'Infrastructure Hub.*?in \[([A-Z0-9-]+)\][^\n]*?has been reinforced', content, re.IGNORECASE)
                     if match:
                         system = match.group(1)
                         logger.info(f"[SOV] Matched system: {system}")
@@ -592,12 +592,12 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
     # Send summary
     if cmd_channel:
         summary = (
-            f"Backfill complete: {added} timers added, {already} already present, {failed} failed."
+            f"Structure backfill complete: {added} timers added, {already} already present, {failed} failed."
         )
         if added > 0:
             summary += "\nAdded timers:\n" + "\n".join(details)
         await cmd_channel.send(summary)
-    logger.info(f"Backfill summary: {added} added, {already} already present, {failed} failed.") 
+    logger.info(f"Structure backfill summary: {added} added, {already} already present, {failed} failed.") 
 
 async def backfill_sov_timers(bot, timerboard, server_config):
     """Backfill timers from the last 5 days of sov channel messages."""
@@ -633,7 +633,8 @@ async def backfill_sov_timers(bot, timerboard, server_config):
             content = "\n".join(embed_text)
             logger.info(f"[SOV-BACKFILL] Extracted embed content: {content}")
         logger.info(f"[SOV-BACKFILL] Considering message: {content}")
-        match = re.search(r'Infrastructure Hub in ([A-Z0-9-]+) has entered reinforced mode', content)
+        # Improved regex: match both Markdown and plain text, and 'has been reinforced'
+        match = re.search(r'Infrastructure Hub.*?in \[([A-Z0-9-]+)\][^\n]*?has been reinforced', content, re.IGNORECASE)
         if match:
             system = match.group(1)
             logger.info(f"[SOV-BACKFILL] Matched system: {system}")
