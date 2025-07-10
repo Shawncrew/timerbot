@@ -20,7 +20,8 @@ from bot.utils.helpers import clean_system_name
 # Initialize logger and show startup banner
 logger.info("""
 =====================================
-    EVE Online Timer Discord Bot
+         NC Timerbot
+   EVE Online Timer Discord Bot
 =====================================
 """)
 
@@ -154,6 +155,11 @@ async def check_channel_access(bot, channel_id, channel_name, required_send=Fals
 @bot.event
 async def on_ready():
     try:
+        logger.info("""
+====================================================
+   TIMERBOT IS ONLINE AND READY!
+====================================================
+""")
         logger.info(f"Bot connected as {bot.user}")
         logger.info(f"Bot application ID: {bot.user.id}")
         
@@ -236,6 +242,11 @@ async def on_ready():
         else:
             logger.error("❌ Could not update timerboards - no channels found")
 
+        logger.info("""
+====================================================
+   STARTING SOV BACKFILL FOR ALL CONFIGURED SERVERS
+====================================================
+""")
         # Run sov backfill for each server with a sov channel (after bot is fully ready)
         for server_name, server_config in CONFIG['servers'].items():
             if server_config.get('sov'):
