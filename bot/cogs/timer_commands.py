@@ -692,3 +692,23 @@ async def backfill_sov_timers(bot, timerboard, server_config):
             summary += "\nAdded timers:\n" + "\n".join(details)
         await cmd_channel.send(summary)
     logger.info(f"SOV Backfill summary: {added} added, {already} already present, {failed} failed.") 
+
+async def update_existing_ihub_timers_with_alert(timerboard):
+    """Retroactively update IHUB timers in alert regions to include the alert emoji."""
+    updated = 0
+    for timer in timerboard.timers:
+        if (
+            '[NC][IHUB]' in timer.description
+            and '🛡️' in timer.description
+            and not '🚨' in timer.description
+        ):
+            # Try to extract region from description (assume format: system - Infrastructure Hub [NC][IHUB] 🛡️)
+            region_match = re.search(r'\(([^)]+)\)', timer.description)
+            region = region_match.group(1).strip().upper() if region_match else None
+            if region and region in ALERT_REGIONS:
+                # Add alert emoji if not present
+                timer.description = timer.description.replace('🛡️', '🛡️ 🚨')
+                updated += 1
+    if updated > 0:
+        timerboard.save_data()
+    logger.info(f"Retroactively updated {updated} IHUB timers with alert emoji.") 

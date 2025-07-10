@@ -14,6 +14,7 @@ from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands, backfill_citadel_timers
 from bot.cogs.timer_commands import backfill_sov_timers
+from bot.cogs.timer_commands import update_existing_ihub_timers_with_alert
 from bot.utils.helpers import clean_system_name
 
 print('NC Timerbot: run_bots.py loaded and running!')
@@ -72,6 +73,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             if server_config.get('sov'):
                 logger.info(f"Running SOV backfill for {server_name}...")
                 await backfill_sov_timers(bot, shared_timerboard, server_config)
+                await update_existing_ihub_timers_with_alert(shared_timerboard)
             
             # Register this bot with the timerboard
             shared_timerboard.register_bot(bot, server_config)
@@ -225,6 +227,9 @@ async def main():
     # Create shared timerboard
     timerboard = TimerBoard()
     
+    # Retroactively update IHUB timers with alert emoji on startup
+    asyncio.get_event_loop().run_until_complete(update_existing_ihub_timers_with_alert(timerboard))
+
     try:
         # Create tasks for each bot
         tasks = []
