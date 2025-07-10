@@ -732,22 +732,26 @@ async def backfill_sov_timers(bot, timerboard, server_config):
     logger.info(f"SOV Backfill summary: {added} added, {already} already present, {failed} failed.") 
 
 async def update_existing_ihub_timers_with_alert(timerboard):
-    """Retroactively update IHUB timers in alert regions to include the alert emoji."""
+    """Retroactively update IHUB timers in alert regions to include the shield and alert emoji."""
     updated = 0
     for timer in timerboard.timers:
         # Only update IHUB timers
-        if '[NC][IHUB]' in timer.description and '🛡️' in timer.description:
+        if '[NC]' in timer.description and '[IHUB]' in timer.description:
             region = timer.region.strip().upper() if timer.region else None
+            # Ensure shield emoji is present after [IHUB]
+            if '🛡️' not in timer.description:
+                # Insert after [IHUB]
+                timer.description = timer.description.replace('[IHUB]', '[IHUB] 🛡️')
+                updated += 1
+            # Ensure alert emoji is present or absent as appropriate
             if region and region in ALERT_REGIONS:
-                # Ensure alert emoji is present
                 if '🚨' not in timer.description:
                     timer.description = timer.description.replace('🛡️', '🛡️ 🚨')
                     updated += 1
             else:
-                # If not in alert region, ensure alert emoji is not present
                 if '🚨' in timer.description:
                     timer.description = timer.description.replace('🛡️ 🚨', '🛡️')
                     updated += 1
     if updated > 0:
         timerboard.save_data()
-    logger.info(f"Retroactively updated {updated} IHUB timers with alert emoji.") 
+    logger.info(f"Retroactively updated {updated} IHUB timers with shield and alert emoji.") 
