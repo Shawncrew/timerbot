@@ -702,9 +702,8 @@ async def update_existing_ihub_timers_with_alert(timerboard):
             and '🛡️' in timer.description
             and not '🚨' in timer.description
         ):
-            # Try to extract region from description (assume format: system - Infrastructure Hub [NC][IHUB] 🛡️)
-            region_match = re.search(r'\(([^)]+)\)', timer.description)
-            region = region_match.group(1).strip().upper() if region_match else None
+            # Use timer.region field for region matching
+            region = timer.region.strip().upper() if timer.region else None
             if region and region in ALERT_REGIONS:
                 # Add alert emoji if not present
                 timer.description = timer.description.replace('🛡️', '🛡️ 🚨')
