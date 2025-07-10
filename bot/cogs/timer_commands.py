@@ -31,13 +31,27 @@ STRUCTURE_TAGS = {
 # Define regions for alert
 ALERT_REGIONS = {"THE SPIRE", "MALPAIS", "OUTER PASSAGE", "OASA", "ETHERIUM REACH"}
 
+def extract_ticker(name):
+    """Extract a ticker from an alliance or corp name (first two uppercase letters)."""
+    if not name:
+        return "[UNK]"
+    # Remove punctuation and split
+    import re
+    words = re.findall(r'[A-Z]', name.upper())
+    if len(words) >= 2:
+        return f"[{''.join(words[:2])}]"
+    elif words:
+        return f"[{words[0]}]"
+    else:
+        return "[UNK]"
+
 def parse_timer_message(content):
-    """Parse structure type, structure name, system, timer type, and timer time from a timer notification message."""
+    """Parse structure type, structure name, system, timer type, timer time, and alliance/corp from a timer notification message."""
     # Structure type: after 'The ' and before first bold
     struct_type_match = re.search(r'The ([^*\n]+)', content)
     structure_type = struct_type_match.group(1).strip() if struct_type_match else None
     # Structure name: first bold after structure type
-    struct_name_match = re.search(r'The [^*\n]+\*\*([^*\n]+)\*\* in', content)
+    struct_name_match = re.search(r'\*\*([^*\n]+)\*\*', content)
     structure_name = struct_name_match.group(1).strip() if struct_name_match else None
     # System: first [SYSTEM] markdown link after 'in'
     system_match = re.search(r'in \[([A-Z0-9-]+)\]', content)
@@ -54,7 +68,12 @@ def parse_timer_message(content):
     else:
         timer_time_match = None
     timer_time_str = timer_time_match.group(1).strip() if timer_time_match else None
-    return structure_type, structure_name, system, timer_type, timer_time_str
+    # Alliance/corp: after 'belonging to [' and before ']' or after 'belonging to' and before '.'
+    alliance_match = re.search(r'belonging to \[([^\]]+)\]', content)
+    if not alliance_match:
+        alliance_match = re.search(r'belonging to ([^.\n]+)', content)
+    alliance = alliance_match.group(1).strip() if alliance_match else None
+    return structure_type, structure_name, system, timer_type, timer_time_str, alliance
 
 class TimerCommands(commands.GroupCog, name="timer"):
     def __init__(self, bot, timerboard):
@@ -295,8 +314,8 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     # Detect shield or armor loss
                     if ("Structure lost shield" in content or "Structure lost armor" in content):
                         # Use improved parsing
-                        structure_type, structure_name, system, timer_type, timer_time_str = parse_timer_message(content)
-                        logger.info(f"[LIVE] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}")
+                        structure_type, structure_name, system, timer_type, timer_time_str, alliance = parse_timer_message(content)
+                        logger.info(f"[LIVE] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}, alliance={alliance}")
                         if not (structure_type and structure_name and system and timer_type and timer_time_str):
                             logger.warning(f"[LIVE] Failed to parse all fields. Message: {content}")
                             return
@@ -316,7 +335,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             logger.warning(f"[LIVE] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                             return
                         # Build tags
-                        tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
+                        tags = f"{extract_ticker(alliance)}[{structure_tag.upper()}][{timer_type.upper()}]"
                         description = f"{system} - {structure_name} {tags}"
                         # Add timer
                         new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
@@ -526,8 +545,8 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
         logger.info(f"[BACKFILL] Considering message: {content}")
         if ("Structure lost shield" in content or "Structure lost armor" in content):
             # Use improved parsing
-            structure_type, structure_name, system, timer_type, timer_time_str = parse_timer_message(content)
-            logger.info(f"[BACKFILL] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}")
+            structure_type, structure_name, system, timer_type, timer_time_str, alliance = parse_timer_message(content)
+            logger.info(f"[BACKFILL] Parsed: structure_type={structure_type}, structure_name={structure_name}, system={system}, timer_type={timer_type}, timer_time={timer_time_str}, alliance={alliance}")
             if not (structure_type and structure_name and system and timer_type and timer_time_str):
                 logger.warning(f"[BACKFILL] Failed to parse all fields. Message: {content}")
                 failed += 1
@@ -554,7 +573,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 logger.info(f"[BACKFILL] Skipping expired timer: {system} - {structure_name} at {timer_time}")
                 continue
             # Build tags
-            tags = f"[NC][{structure_tag.upper()}][{timer_type.upper()}]"
+            tags = f"{extract_ticker(alliance)}[{structure_tag.upper()}][{timer_type.upper()}]"
             description = f"{system} - {structure_name} {tags}"
             # Check for duplicate
             duplicate = False
