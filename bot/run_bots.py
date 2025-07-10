@@ -227,9 +227,6 @@ async def main():
     # Create shared timerboard
     timerboard = TimerBoard()
     
-    # Retroactively update IHUB timers with alert emoji on startup
-    asyncio.get_event_loop().run_until_complete(update_existing_ihub_timers_with_alert(timerboard))
-
     try:
         # Create tasks for each bot
         tasks = []
