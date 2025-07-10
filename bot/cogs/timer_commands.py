@@ -681,6 +681,11 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                     logger.warning(f"[SOV-BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
                     failed += 1
                     continue
+                # Skip expired timers
+                now_utc = datetime.datetime.now(EVE_TZ)
+                if timer_time < now_utc:
+                    logger.info(f"[SOV-BACKFILL] Skipping expired timer: {system} - Infrastructure Hub at {timer_time}")
+                    continue
                 # Try to get region from content (look for parenthesis after system link)
                 region_match = re.search(r'\[' + re.escape(system) + r'\][^\n]*?\(([^)]+)\)', content)
                 region = region_match.group(1).strip().upper() if region_match else None
