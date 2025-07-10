@@ -15,54 +15,13 @@ import aiohttp
 import json
 from pathlib import Path
 import yaml
-import logging
-from logging.handlers import RotatingFileHandler
+from bot.utils.logger import logger
 import sys
 
 # Update paths to be absolute
 SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
 CONFIG_FILE = "/opt/timerbot/bot/config.yaml"
 LOG_DIR = "/opt/timerbot/logs"
-
-# Then logger setup
-def setup_logging():
-    # Update log directory
-    log_dir = LOG_DIR
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # Configure logging
-    logger = logging.getLogger('timerbot')
-    logger.setLevel(logging.INFO)
-    
-    # Add rotating file handler (10 files, 10MB each)
-    handler = RotatingFileHandler(
-        f"{log_dir}/bot.log",
-        maxBytes=10_000_000,
-        backupCount=10
-    )
-    
-    # Format for log messages
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    
-    # Also log to console
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    logger.addHandler(console)
-    
-    return logger
-
-# Initialize logger
-logger = setup_logging()
-logger.info("""
-=====================================
-    EVE Online Timer Discord Bot
-=====================================
-""")
 
 # Then the rest of the bot code
 
