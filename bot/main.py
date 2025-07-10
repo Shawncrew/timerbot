@@ -14,6 +14,7 @@ from bot.utils.config import load_config
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands
+from bot.cogs.timer_commands import backfill_sov_timers
 from bot.utils.helpers import clean_system_name
 
 # Initialize logger and show startup banner
@@ -270,6 +271,11 @@ async def setup():
         cog = TimerCommands(bot, timerboard)
         await bot.add_cog(cog)
         logger.info("Successfully initialized cogs")
+        # Run sov backfill for each server with a sov channel
+        for server_name, server_config in CONFIG['servers'].items():
+            if server_config.get('sov'):
+                logger.info(f"Running SOV backfill for {server_name}...")
+                await backfill_sov_timers(bot, timerboard, server_config)
     except Exception as e:
         logger.error(f"Error initializing cogs: {e}")
 

@@ -329,6 +329,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                     break
                 # --- New sov channel logic ---
                 if message.channel.id == server_config.get('sov'):
+                    logger.info(f"[SOV] Received message in sov channel: {message.id} | Author: {message.author} | Content: {message.content} | Embeds: {len(message.embeds)}")
                     content = message.content
                     # If content is empty or doesn't contain keywords, try to extract from embed
                     if (not content or "Infrastructure Hub" not in content) and message.embeds:
@@ -342,14 +343,18 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             embed_text.append(f"{field.name} {field.value}")
                         content = "\n".join(embed_text)
                         logger.info(f"[SOV] Extracted embed content: {content}")
+                    else:
+                        logger.info(f"[SOV] Using message content for parsing: {content}")
                     # Look for Infrastructure Hub reinforced pattern
                     match = re.search(r'Infrastructure Hub in ([A-Z0-9-]+) has entered reinforced mode', content)
                     if match:
                         system = match.group(1)
+                        logger.info(f"[SOV] Matched system: {system}")
                         # Try to extract timer from embed (look for datetime in content)
                         timer_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content)
                         if timer_match:
                             timer_time_str = timer_match.group(1)
+                            logger.info(f"[SOV] Matched timer time: {timer_time_str}")
                             try:
                                 timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
                                 timer_time = EVE_TZ.localize(timer_time)
@@ -359,6 +364,7 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             tags = "[NC][IHUB]"
                             description = f"{system} - Infrastructure Hub {tags}"
                             new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                            logger.info(f"[SOV] Added timer: {description} at {timer_time}")
                             # Notify command channel
                             cmd_channel = self.bot.get_channel(server_config['commands'])
                             if cmd_channel:
@@ -369,6 +375,8 @@ Note: Medium structures should use "HULL" since there is only one timer."""
                             logger.info(f"Auto-added timer from SOV: {description}")
                         else:
                             logger.warning(f"[SOV] Could not find timer time in message: {content}")
+                    else:
+                        logger.info(f"[SOV] No match for Infrastructure Hub reinforced pattern in content: {content}")
                     break
         except Exception as e:
             logger.error(f"Error processing citadel-attacked message: {e}")
@@ -590,3 +598,97 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
             summary += "\nAdded timers:\n" + "\n".join(details)
         await cmd_channel.send(summary)
     logger.info(f"Backfill summary: {added} added, {already} already present, {failed} failed.") 
+
+async def backfill_sov_timers(bot, timerboard, server_config):
+    """Backfill timers from the last 5 days of sov channel messages."""
+    channel_id = server_config.get('sov')
+    cmd_channel_id = server_config.get('commands')
+    if not channel_id:
+        logger.info("No sov channel configured for backfill.")
+        return
+    channel = bot.get_channel(channel_id)
+    cmd_channel = bot.get_channel(cmd_channel_id)
+    if not channel:
+        logger.warning(f"Could not find sov channel for backfill.")
+        return
+    now = datetime.datetime.now(pytz.UTC)
+    five_days_ago = now - datetime.timedelta(days=5)
+    added = 0
+    already = 0
+    failed = 0
+    details = []
+    async for message in channel.history(limit=1000, after=five_days_ago):
+        content = message.content
+        # If content is empty or doesn't contain keywords, try to extract from embed
+        if (not content or "Infrastructure Hub" not in content) and message.embeds:
+            embed = message.embeds[0]
+            embed_text = []
+            if embed.title:
+                embed_text.append(embed.title)
+            if embed.description:
+                embed_text.append(embed.description)
+            for field in getattr(embed, 'fields', []):
+                embed_text.append(f"{field.name} {field.value}")
+            content = "\n".join(embed_text)
+            logger.info(f"[SOV-BACKFILL] Extracted embed content: {content}")
+        logger.info(f"[SOV-BACKFILL] Considering message: {content}")
+        match = re.search(r'Infrastructure Hub in ([A-Z0-9-]+) has entered reinforced mode', content)
+        if match:
+            system = match.group(1)
+            logger.info(f"[SOV-BACKFILL] Matched system: {system}")
+            timer_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content)
+            if timer_match:
+                timer_time_str = timer_match.group(1)
+                logger.info(f"[SOV-BACKFILL] Matched timer time: {timer_time_str}")
+                try:
+                    timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                    timer_time = EVE_TZ.localize(timer_time)
+                except Exception as e:
+                    logger.warning(f"[SOV-BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                    failed += 1
+                    continue
+                # Skip expired timers
+                now_utc = datetime.datetime.now(EVE_TZ)
+                if timer_time < now_utc:
+                    logger.info(f"[SOV-BACKFILL] Skipping expired timer: {system} - Infrastructure Hub at {timer_time}")
+                    continue
+                tags = "[NC][IHUB]"
+                description = f"{system} - Infrastructure Hub {tags}"
+                # Check for duplicate
+                duplicate = False
+                for t in timerboard.timers:
+                    if (
+                        t.system.upper() == system.upper()
+                        and t.structure_name.upper() == "INFRASTRUCTURE HUB"
+                        and abs((t.time - timer_time).total_seconds()) < 60
+                    ):
+                        duplicate = True
+                        break
+                if duplicate:
+                    logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}")
+                    already += 1
+                    continue
+                # Add timer
+                try:
+                    new_timer, _ = await timerboard.add_timer(timer_time, description)
+                    logger.info(f"[SOV-BACKFILL] Added timer: {description} at {timer_time}")
+                    added += 1
+                    add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
+                    details.append(f"{system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                except Exception as e:
+                    logger.warning(f"[SOV-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
+                    failed += 1
+                    continue
+            else:
+                logger.warning(f"[SOV-BACKFILL] Could not find timer time in message: {content}")
+        else:
+            logger.info(f"[SOV-BACKFILL] Message does not match Infrastructure Hub reinforced pattern. Skipping.")
+    # Send summary
+    if cmd_channel:
+        summary = (
+            f"SOV Backfill complete: {added} timers added, {already} already present, {failed} failed."
+        )
+        if added > 0:
+            summary += "\nAdded timers:\n" + "\n".join(details)
+        await cmd_channel.send(summary)
+    logger.info(f"SOV Backfill summary: {added} added, {already} already present, {failed} failed.") 
