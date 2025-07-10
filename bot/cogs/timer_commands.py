@@ -601,6 +601,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
 
 async def backfill_sov_timers(bot, timerboard, server_config):
     """Backfill timers from the last 5 days of sov channel messages."""
+    logger.info(f"[SOV-BACKFILL] Running SOV backfill for server config: {server_config}")
     channel_id = server_config.get('sov')
     cmd_channel_id = server_config.get('commands')
     if not channel_id:
