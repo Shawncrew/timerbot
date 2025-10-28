@@ -50,11 +50,13 @@ def parse_timer_message(content):
     # Structure type: after 'The ' and before first bold
     struct_type_match = re.search(r'The ([^*\n]+)', content)
     structure_type = struct_type_match.group(1).strip() if struct_type_match else None
-    # Structure name: first bold after structure type
+    # Structure name: first bold after structure type (handle both **name** and **name.**)
     struct_name_match = re.search(r'\*\*([^*\n]+)\*\*', content)
     structure_name = struct_name_match.group(1).strip() if struct_name_match else None
-    # System: first [SYSTEM] markdown link after 'in'
-    system_match = re.search(r'in \[([A-Z0-9-]+)\]', content)
+    # System: look for bold text after "in" or markdown link
+    system_match = re.search(r'in \*\*([^*\n]+)\*\*', content)
+    if not system_match:
+        system_match = re.search(r'in \[([A-Z0-9-]+)\]', content)
     system = system_match.group(1).strip() if system_match else None
     # Timer type and time
     timer_type = None
@@ -94,11 +96,16 @@ or
 2. !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
 or
 3. !add <copy text from selected item> [alliance ticker][structure type][timer type]
+or
+4. !add Merc Den <systemName> <planet> <h> <m> (for Mercenary Dens)
 
 Example:
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
 38.4 AU
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+
+Mercenary Den example:
+!add Merc Den Jita Planet I 2 30
 
 Note: Medium structures should use "HULL" since there is only one timer."""
 
@@ -113,14 +120,55 @@ or
 !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
 or
 !add <copy text from selected item> [alliance ticker][structure type][timer type]
+or
+!add Merc Den <systemName> <planet> <h> <m> (for Mercenary Dens)
 
 Example:
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
 38.4 AU
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
 
+Mercenary Den example:
+!add Merc Den Jita Planet I 2 30
+
 Note: Medium structures should use "HULL" since there is only one timer."""
         try:
+            # Check for Mercenary Den format: !add Merc Den <systemName> <planet> <h> <m>
+            merc_den_match = re.match(r'^Merc Den\s+([A-Z0-9-]+)\s+([^\s]+)\s+(\d+)\s+(\d+)\s*$', input_text.strip())
+            if merc_den_match:
+                system = merc_den_match.group(1)
+                planet = merc_den_match.group(2)
+                hours = int(merc_den_match.group(3))
+                minutes = int(merc_den_match.group(4))
+                
+                # Calculate timer time (current time + hours + minutes)
+                now = datetime.datetime.now(EVE_TZ)
+                timer_time = now + datetime.timedelta(hours=hours, minutes=minutes)
+                
+                # Create description for Mercenary Den
+                description = f"{system} - {planet} [NC][MERCENARY DEN]"
+                
+                new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                
+                # Send confirmation
+                if similar_timers:
+                    similar_list = "\n".join([t.to_string() for t in similar_timers])
+                    await ctx.send(
+                        f"⚠️ Warning: Similar timers found:\n{similar_list}\n"
+                        f"Added anyway with ID {new_timer.timer_id}"
+                    )
+                else:
+                    await ctx.send(f"✅ Mercenary Den timer added: {system} - {planet} at {timer_time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {new_timer.timer_id})")
+                
+                # Update all timerboards
+                timerboard_channels = [
+                    self.bot.get_channel(server_config['timerboard'])
+                    for server_config in CONFIG['servers'].values()
+                    if server_config['timerboard'] is not None
+                ]
+                await self.timerboard.update_timerboard(timerboard_channels)
+                return
+            
             # Look for the new format first (structure name on first line, distance on second, reinforced/anchoring on third)
             lines = input_text.split('\n')
             if len(lines) >= 3 and ('Reinforced until' in lines[2] or 'Anchoring until' in lines[2]):
