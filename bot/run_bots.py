@@ -34,6 +34,10 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     # Disable default help command to use our custom one
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
     
+    # Explicitly remove any default help command if it exists
+    if bot.help_command:
+        bot.remove_command('help')
+    
     @bot.event
     async def on_ready():
         try:
@@ -114,6 +118,11 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     
     # Add the cog
     try:
+        # Explicitly remove help command if it exists (in case it was registered)
+        if 'help' in bot.all_commands:
+            logger.info(f"Removing existing help command for {server_name}...")
+            bot.remove_command('help')
+        
         logger.info(f"Creating TimerCommands cog for {server_name}...")
         cog = TimerCommands(bot, shared_timerboard)
         logger.info(f"TimerCommands cog created for {server_name}")

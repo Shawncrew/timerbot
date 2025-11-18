@@ -504,7 +504,7 @@ Use this if the timerboard display becomes out of sync or corrupted."""
             logger.error(f"Error filtering regions: {e}")
             await ctx.send(f"Error filtering regions: {e}")
 
-    @commands.command()
+    @commands.command(name='timerhelp', aliases=['commands', 'help'])
     @commands.check(cmd_channel_check)
     async def help(self, ctx, command_name: str = None):
         """Display help information for all timerbot commands.
