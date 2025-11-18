@@ -317,32 +317,46 @@ Note: Medium structures should use "HULL" since there is only one timer."""
         try:
             logger.info(f"{ctx.author} requested timerboard refresh")
             
-            # Get all timerboard channels
-            timerboard_channels = [
-                self.bot.get_channel(server_config['timerboard'])
-                for server_config in CONFIG['servers'].values()
-                if server_config['timerboard'] is not None
-            ]
+            # Get all timerboard channels, filtering out None values
+            timerboard_channels = []
+            for server_config in CONFIG['servers'].values():
+                channel_id = server_config.get('timerboard')
+                if channel_id is not None:
+                    channel = self.bot.get_channel(channel_id)
+                    if channel is not None:
+                        timerboard_channels.append(channel)
+            
+            if not timerboard_channels:
+                await ctx.send("❌ No timerboard channels found. Please check your configuration.")
+                logger.warning("No timerboard channels found for refresh")
+                return
+            
+            logger.info(f"Refreshing {len(timerboard_channels)} timerboard channel(s)")
             
             # Delete all bot messages in each channel
             total_deleted = 0
             for channel in timerboard_channels:
-                deleted = 0
-                async for message in channel.history(limit=100):
-                    if message.author == self.bot.user:
-                        await message.delete()
-                        deleted += 1
-                total_deleted += deleted
-                logger.info(f"Deleted {deleted} messages from {channel.name}")
+                try:
+                    deleted = 0
+                    async for message in channel.history(limit=100):
+                        if message.author == self.bot.user:
+                            await message.delete()
+                            deleted += 1
+                    total_deleted += deleted
+                    logger.info(f"Deleted {deleted} messages from {channel.name} in {channel.guild.name}")
+                except Exception as e:
+                    logger.error(f"Error deleting messages from {channel.name} in {channel.guild.name}: {e}")
+                    await ctx.send(f"⚠️ Error deleting messages from {channel.name}: {e}")
             
             # Recreate the timerboards
             await self.timerboard.update_timerboard(timerboard_channels)
             
             logger.info(f"Timerboards refreshed - deleted {total_deleted} messages and recreated displays")
-            await ctx.send(f"Timerboards refreshed - deleted {total_deleted} messages and recreated displays")
+            await ctx.send(f"✅ Timerboards refreshed - deleted {total_deleted} messages and recreated displays in {len(timerboard_channels)} channel(s)")
             
         except Exception as e:
             logger.error(f"Error refreshing timerboards: {e}")
+            logger.exception("Full traceback:")
             await ctx.send(f"Error refreshing timerboards: {e}")
 
     @commands.command()
