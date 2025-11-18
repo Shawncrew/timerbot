@@ -32,7 +32,8 @@ CONFIG = load_config()
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+# Disable default help command to use our custom one
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 # Initialize timerboard
 timerboard = TimerBoard()

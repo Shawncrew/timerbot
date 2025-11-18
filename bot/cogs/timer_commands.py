@@ -527,20 +527,21 @@ or
 
 Use `!help <command>` for detailed information about a specific command.
 Example: `!help add`"""
-        # Get the command name from the message if provided
-        message_parts = ctx.message.content.split()
-        if len(message_parts) > 1:
-            command_name = message_parts[1].lower()
-            # Find the command
-            command = self.bot.get_command(command_name)
-            if command:
-                help_text = f"**!{command.name}**\n\n{command.help or 'No description available.'}"
-                await ctx.send(help_text)
+        try:
+            # Get the command name from the message if provided
+            message_parts = ctx.message.content.split()
+            if len(message_parts) > 1:
+                command_name = message_parts[1].lower()
+                # Find the command
+                command = self.bot.get_command(command_name)
+                if command:
+                    help_text = f"**!{command.name}**\n\n{command.help or 'No description available.'}"
+                    await ctx.send(help_text)
+                else:
+                    await ctx.send(f"Command '{command_name}' not found. Use `!help` to see all commands.")
             else:
-                await ctx.send(f"Command '{command_name}' not found. Use `!help` to see all commands.")
-        else:
-            # Show general help
-            help_text = """**Timerbot Commands**
+                # Show general help
+                help_text = """**Timerbot Commands**
 
 **!add** - Add a new timer
 ```
@@ -571,7 +572,11 @@ Use `!help add` for full format details.
 ```
 
 Use `!help <command>` for detailed information about any command."""
-            await ctx.send(help_text)
+                await ctx.send(help_text)
+        except Exception as e:
+            logger.error(f"Error in help command: {e}")
+            logger.exception("Full traceback:")
+            await ctx.send(f"Error displaying help: {e}")
 
     @commands.command()
     @commands.check(cmd_channel_check)

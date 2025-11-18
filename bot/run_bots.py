@@ -31,7 +31,8 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     intents.message_content = True
     intents.guilds = True
     
-    bot = commands.Bot(command_prefix='!', intents=intents)
+    # Disable default help command to use our custom one
+    bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
     
     @bot.event
     async def on_ready():
