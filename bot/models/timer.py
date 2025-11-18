@@ -102,6 +102,7 @@ class TimerBoard:
         self.bots = []  # List to store bot instances
         self.last_update = None
         self.update_task = None
+        self.filtered_regions = set()  # Set of region names to filter out
         self.load_data()
 
     def register_bot(self, bot, server_config):
@@ -158,7 +159,8 @@ class TimerBoard:
                     'region': timer.region  # Add region to saved data
                 }
                 for timer in self.timers
-            ]
+            ],
+            'filtered_regions': list(self.filtered_regions)  # Save filtered regions
         }
         
         try:
@@ -194,6 +196,10 @@ class TimerBoard:
             self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)
             logger.info(f"Next timer ID set to: {self.next_id}")
             
+            # Load filtered regions
+            self.filtered_regions = set(data.get('filtered_regions', []))
+            logger.info(f"Loaded {len(self.filtered_regions)} filtered regions: {self.filtered_regions}")
+            
             self.timers = []
             for timer_data in data.get('timers', []):
                 try:
@@ -220,6 +226,7 @@ class TimerBoard:
             logger.info("Starting with empty timerboard")
             self.next_id = self.STARTING_TIMER_ID
             self.timers = []
+            self.filtered_regions = set()
 
     def update_next_id(self):
         """Update next_id based on highest existing timer ID"""
@@ -379,9 +386,17 @@ class TimerBoard:
                 sorted_timers = sorted(self.timers, key=lambda x: x.time)
                 logger.info(f"Sorted timers for {channel.guild.name}: {len(sorted_timers)} timers")
                 
+                # Filter out timers from filtered regions
+                filtered_regions_upper = {r.upper() for r in self.filtered_regions}
+                filtered_timers = [
+                    t for t in sorted_timers 
+                    if not t.region or t.region.upper() not in filtered_regions_upper
+                ]
+                logger.info(f"After filtering: {len(filtered_timers)} timers (filtered out {len(sorted_timers) - len(filtered_timers)})")
+                
                 # Build timer list
                 timer_list = []
-                for timer in sorted_timers:
+                for timer in filtered_timers:
                     timer_list.append(timer.to_string())
                     logger.info(f"Added timer to list: {timer}")
                 

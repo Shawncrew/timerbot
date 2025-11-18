@@ -345,6 +345,96 @@ Note: Medium structures should use "HULL" since there is only one timer."""
             logger.error(f"Error refreshing timerboards: {e}")
             await ctx.send(f"Error refreshing timerboards: {e}")
 
+    @commands.command()
+    @commands.check(cmd_channel_check)
+    async def filter(self, ctx):
+        """Filter timers from specific regions: The Kalevala Expanse, Oasa, Cobalt Edge, The Spire, Malpais, Etherium Reach, and Perrigen Falls"""
+        try:
+            regions_to_filter = {
+                'The Kalevala Expanse',
+                'Oasa',
+                'Cobalt Edge',
+                'The Spire',
+                'Malpais',
+                'Etherium Reach',
+                'Perrigen Falls'
+            }
+            
+            # Add regions to filtered set
+            added_regions = []
+            for region in regions_to_filter:
+                if region.upper() not in {r.upper() for r in self.timerboard.filtered_regions}:
+                    self.timerboard.filtered_regions.add(region)
+                    added_regions.append(region)
+            
+            if added_regions:
+                self.timerboard.save_data()
+                
+                # Update all timerboards
+                timerboard_channels = [
+                    self.bot.get_channel(server_config['timerboard'])
+                    for server_config in CONFIG['servers'].values()
+                    if server_config['timerboard'] is not None
+                ]
+                await self.timerboard.update_timerboard(timerboard_channels)
+                
+                logger.info(f"{ctx.author} filtered regions: {added_regions}")
+                await ctx.send(f"✅ Filtered {len(added_regions)} region(s): {', '.join(added_regions)}")
+            else:
+                await ctx.send("All specified regions are already filtered.")
+                
+        except Exception as e:
+            logger.error(f"Error filtering regions: {e}")
+            await ctx.send(f"Error filtering regions: {e}")
+
+    @commands.command()
+    @commands.check(cmd_channel_check)
+    async def unfilter(self, ctx):
+        """Unfilter timers from specific regions: The Kalevala Expanse, Oasa, Cobalt Edge, The Spire, Malpais, Etherium Reach, and Perrigen Falls"""
+        try:
+            regions_to_unfilter = {
+                'The Kalevala Expanse',
+                'Oasa',
+                'Cobalt Edge',
+                'The Spire',
+                'Malpais',
+                'Etherium Reach',
+                'Perrigen Falls'
+            }
+            
+            # Remove regions from filtered set (case-insensitive)
+            removed_regions = []
+            filtered_regions_upper = {r.upper() for r in self.timerboard.filtered_regions}
+            
+            for region in regions_to_unfilter:
+                if region.upper() in filtered_regions_upper:
+                    # Find the exact region name in the set (case-insensitive match)
+                    for filtered_region in list(self.timerboard.filtered_regions):
+                        if filtered_region.upper() == region.upper():
+                            self.timerboard.filtered_regions.remove(filtered_region)
+                            removed_regions.append(filtered_region)
+                            break
+            
+            if removed_regions:
+                self.timerboard.save_data()
+                
+                # Update all timerboards
+                timerboard_channels = [
+                    self.bot.get_channel(server_config['timerboard'])
+                    for server_config in CONFIG['servers'].values()
+                    if server_config['timerboard'] is not None
+                ]
+                await self.timerboard.update_timerboard(timerboard_channels)
+                
+                logger.info(f"{ctx.author} unfiltered regions: {removed_regions}")
+                await ctx.send(f"✅ Unfiltered {len(removed_regions)} region(s): {', '.join(removed_regions)}")
+            else:
+                await ctx.send("None of the specified regions are currently filtered.")
+                
+        except Exception as e:
+            logger.error(f"Error unfiltering regions: {e}")
+            await ctx.send(f"Error unfiltering regions: {e}")
+
     @commands.Cog.listener()
     async def on_message(self, message):
         """Monitor citadel channels for structure messages and auto-add timers"""
