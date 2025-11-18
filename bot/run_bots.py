@@ -166,6 +166,14 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     logger.info(f"  Already alerted 60min: {timer.timer_id in sixty_min_alerted}")
                     logger.info(f"  Already alerted start: {timer.timer_id in start_time_alerted}")
                     
+                    # Check if timer is in a filtered region (skip alerts if filtered)
+                    filtered_regions_upper = {r.upper() for r in shared_timerboard.filtered_regions}
+                    is_filtered = timer.region and timer.region.upper() in filtered_regions_upper
+                    
+                    if is_filtered:
+                        logger.info(f"  Timer is in filtered region '{timer.region}', skipping alerts")
+                        continue
+                    
                     # Alert at 60 minutes if not already alerted
                     if 59.0 <= time_until <= 61.0:  # ±1 minute window for 60-minute alert
                         logger.info(f"  Timer is in 60-minute alert window ({time_until:.1f} minutes)")

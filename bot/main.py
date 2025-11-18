@@ -76,6 +76,14 @@ async def check_timers():
                 time_until = (timer.time - now).total_seconds() / 60
                 logger.debug(f"Timer {timer.timer_id} is {time_until:.1f} minutes away")
                 
+                # Check if timer is in a filtered region (skip alerts if filtered)
+                filtered_regions_upper = {r.upper() for r in timerboard.filtered_regions}
+                is_filtered = timer.region and timer.region.upper() in filtered_regions_upper
+                
+                if is_filtered:
+                    logger.debug(f"Timer {timer.timer_id} is in filtered region '{timer.region}', skipping alerts")
+                    continue
+                
                 # Alert at 60 minutes if not already alerted
                 if 59 <= time_until <= 60 and timer.timer_id not in sixty_min_alerted:
                     logger.info(f"Timer {timer.timer_id} is at 60 minute mark")

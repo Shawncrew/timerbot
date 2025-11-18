@@ -383,6 +383,14 @@ async def check_timers():
                 time_until = timer.time - now
                 minutes_until = time_until.total_seconds() / 60
                 
+                # Check if timer is in a filtered region (skip alerts if filtered)
+                filtered_regions_upper = {r.upper() for r in timerboard.filtered_regions}
+                is_filtered = timer.region and timer.region.upper() in filtered_regions_upper
+                
+                if is_filtered:
+                    logger.debug(f"Timer {timer.timer_id} is in filtered region '{timer.region}', skipping alerts")
+                    continue
+                
                 # Check for notification time (e.g. 60 minutes before)
                 if CONFIG['notification_time'] <= minutes_until < CONFIG['notification_time'] + 1:
                     cmd_channel = bot.get_channel(TIMERBOARD_CMD_CHANNEL_ID)
