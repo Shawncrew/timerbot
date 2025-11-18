@@ -85,12 +85,17 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             
             # Initial timerboard update
             logger.info(f"Performing initial timerboard update for {server_name}")
-            timerboard_channel = bot.get_channel(server_config['timerboard'])
-            if timerboard_channel:
-                logger.info(f"Found timerboard channel: {timerboard_channel.name} in {timerboard_channel.guild.name}")
-                await shared_timerboard.update_timerboard([timerboard_channel])
-            else:
-                logger.error(f"Could not find timerboard channel for {server_name}")
+            try:
+                timerboard_channel = bot.get_channel(server_config['timerboard'])
+                if timerboard_channel:
+                    logger.info(f"Found timerboard channel: {timerboard_channel.name} in {timerboard_channel.guild.name}")
+                    await shared_timerboard.update_timerboard([timerboard_channel])
+                    logger.info(f"Successfully updated timerboard for {server_name}")
+                else:
+                    logger.error(f"Could not find timerboard channel for {server_name}")
+            except Exception as e:
+                logger.error(f"Error updating timerboard for {server_name}: {e}")
+                logger.exception("Full traceback:")
                 
         except Exception as e:
             logger.error(f"Error in on_ready for {server_name}: {e}")
@@ -225,32 +230,47 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     try:
         logger.info(f"Starting bot for {server_name} with token: {server_config['token'][:20]}...")
         await bot.start(server_config['token'])
+    except KeyboardInterrupt:
+        logger.info(f"Received keyboard interrupt for {server_name}, shutting down...")
+        raise
     except Exception as e:
         logger.error(f"Error running bot for {server_name}: {e}")
         logger.exception("Full traceback:")
+        raise
 
 async def main():
     """Run all bot instances"""
-    config = load_config()
-    
-    # Create shared timerboard
-    timerboard = TimerBoard()
-    
     try:
+        logger.info("Loading configuration...")
+        config = load_config()
+        logger.info("Configuration loaded successfully")
+        
+        # Create shared timerboard
+        logger.info("Initializing shared timerboard...")
+        timerboard = TimerBoard()
+        logger.info("Timerboard initialized successfully")
+        
         # Create tasks for each bot
         tasks = []
         for server_name, server_config in config['servers'].items():
-            if server_config['token']:  # Only run if token is configured
+            if server_config.get('token'):  # Only run if token is configured
+                logger.info(f"Creating bot task for {server_name}...")
                 task = run_bot_instance(server_name, server_config, timerboard)
                 tasks.append(task)
         
+        logger.info(f"Starting {len(tasks)} bot instance(s)...")
         # Run all bots
         await asyncio.gather(*tasks)
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down...")
+    except Exception as e:
+        logger.error(f"Fatal error in main(): {e}")
+        logger.exception("Full traceback:")
+        raise
     finally:
         # Cancel the update task if it exists
-        if timerboard.update_task:
+        if 'timerboard' in locals() and timerboard.update_task:
+            logger.info("Cancelling timerboard update task...")
             timerboard.update_task.cancel()
             try:
                 await timerboard.update_task
@@ -258,4 +278,10 @@ async def main():
                 pass
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        logger.info("Starting bot application...")
+        asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Fatal error starting application: {e}")
+        logger.exception("Full traceback:")
+        raise 

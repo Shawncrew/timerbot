@@ -506,7 +506,7 @@ Use this if the timerboard display becomes out of sync or corrupted."""
 
     @commands.command()
     @commands.check(cmd_channel_check)
-    async def help(self, ctx):
+    async def help(self, ctx, command_name: str = None):
         """Display help information for all timerbot commands.
 
 **Usage:**
@@ -528,15 +528,128 @@ or
 Use `!help <command>` for detailed information about a specific command.
 Example: `!help add`"""
         try:
-            # Get the command name from the message if provided
-            message_parts = ctx.message.content.split()
-            if len(message_parts) > 1:
-                command_name = message_parts[1].lower()
-                # Find the command
-                command = self.bot.get_command(command_name)
-                if command:
-                    help_text = f"**!{command.name}**\n\n{command.help or 'No description available.'}"
-                    await ctx.send(help_text)
+            if command_name:
+                command_name = command_name.lower()
+                # Show specific command help
+                help_texts = {
+                    'add': """**!add** - Add a new timer to the timerboard.
+
+**Supported formats:**
+
+**1. Direct time format:**
+```
+!add YYYY-MM-DD HH:MM:SS system - structure [tags]
+```
+Example: `!add 2024-01-15 14:30:00 Jita - Keepstar [NC][KEEPSTAR][ARMOR]`
+
+**2. Reinforced/Anchoring format:**
+```
+!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+```
+Example:
+```
+!add 4M-QXK - PRIVATE MATSUNOMI P4M3
+38.4 AU
+Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+```
+
+**3. Multi-line structure format (copy from game):**
+Copy structure name, distance, and reinforced line:
+```
+Structure Name
+Distance
+Reinforced until YYYY.MM.DD HH:MM:SS [alliance][structure][timer type]
+```
+
+**4. Mercenary Den format:**
+```
+!add Merc Den <systemName> <planet> <hours> <minutes> [TAG]
+```
+Examples:
+- `!add Merc Den Jita Planet I 2 30 [NC]`
+- `!add Merc Den Jita Planet I 2 30 [DECOY]`
+- `!add Merc Den Jita Planet I 2 30` (defaults to [NC] if tag omitted)
+
+**Tags:** `[alliance ticker][structure type][timer type]`
+- Alliance: `[NC]`, `[HORDE]`, `[DECOY]`, etc.
+- Structure: `[KEEPSTAR]`, `[FORTIZAR]`, `[AZBEL]`, `[ATHANOR]`, `[IHUB]`, `[MERCENARY DEN]`, etc.
+- Timer: `[ARMOR]`, `[HULL]`, `[SHIELD]`
+
+**Note:** Medium structures use `[HULL]` only (single timer).""",
+                    'rm': """**!rm** - Remove a timer from the timerboard by its ID.
+
+**Usage:**
+```
+!rm <timer_id>
+```
+
+**Example:**
+```
+!rm 1001
+```
+
+The timer ID is shown in parentheses at the end of each timer entry in the timerboard.""",
+                    'refresh': """**!refresh** - Refresh the timerboard display by clearing and recreating all messages.
+
+**Usage:**
+```
+!refresh
+```
+
+This command will:
+- Delete all existing bot messages in timerboard channels
+- Recreate the timerboard display with current timers
+- Update all configured timerboard channels across all servers
+
+Use this if the timerboard display becomes out of sync or corrupted.""",
+                    'filter': """**!filter** - Filter timers from specific regions to hide them from the timerboard and disable alerts.
+
+**Usage:**
+```
+!filter
+```
+
+**Filtered regions:**
+- The Kalevala Expanse
+- Oasa
+- Cobalt Edge
+- The Spire
+- Malpais
+- Etherium Reach
+- Perrigen Falls
+
+**Effects:**
+- Timers from these regions are hidden from the timerboard display
+- No alerts are sent for filtered timers (60-minute warnings or "timer starting now")
+- Timers remain in the database and can be restored with `!unfilter`
+
+**Note:** This command filters all specified regions at once. Use `!unfilter` to restore them.""",
+                    'unfilter': """**!unfilter** - Unfilter timers from specific regions to restore them to the timerboard and enable alerts.
+
+**Usage:**
+```
+!unfilter
+```
+
+**Unfiltered regions:**
+- The Kalevala Expanse
+- Oasa
+- Cobalt Edge
+- The Spire
+- Malpais
+- Etherium Reach
+- Perrigen Falls
+
+**Effects:**
+- Timers from these regions are restored to the timerboard display
+- Alerts are re-enabled for unfiltered timers
+- All timers from these regions become visible again
+
+**Note:** This command unfilters all specified regions at once. Use `!filter` to hide them again."""
+                }
+                
+                if command_name in help_texts:
+                    await ctx.send(help_texts[command_name])
                 else:
                     await ctx.send(f"Command '{command_name}' not found. Use `!help` to see all commands.")
             else:

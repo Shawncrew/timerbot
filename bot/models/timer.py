@@ -387,10 +387,13 @@ class TimerBoard:
                 logger.info(f"Sorted timers for {channel.guild.name}: {len(sorted_timers)} timers")
                 
                 # Filter out timers from filtered regions
+                # Ensure filtered_regions exists (safety check)
+                if not hasattr(self, 'filtered_regions'):
+                    self.filtered_regions = set()
                 filtered_regions_upper = {r.upper() for r in self.filtered_regions}
                 filtered_timers = [
                     t for t in sorted_timers 
-                    if not t.region or t.region.upper() not in filtered_regions_upper
+                    if not t.region or (t.region and t.region.upper() not in filtered_regions_upper)
                 ]
                 logger.info(f"After filtering: {len(filtered_timers)} timers (filtered out {len(sorted_timers) - len(filtered_timers)})")
                 
