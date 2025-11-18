@@ -504,19 +504,20 @@ Use this if the timerboard display becomes out of sync or corrupted."""
             logger.error(f"Error filtering regions: {e}")
             await ctx.send(f"Error filtering regions: {e}")
 
-    @commands.command(name='timerhelp', aliases=['commands', 'help'])
+    @commands.command(name='timerhelp', aliases=['commands'])
     @commands.check(cmd_channel_check)
     async def help(self, ctx, command_name: str = None):
         """Display help information for all timerbot commands.
 
 **Usage:**
 ```
-!help
+!timerhelp
 ```
 or
 ```
-!help <command>
+!timerhelp <command>
 ```
+(You can also use `!commands` as an alias)
 
 **Available commands:**
 - `!add` - Add a new timer (multiple formats supported)
@@ -525,8 +526,8 @@ or
 - `!filter` - Filter timers from specific regions
 - `!unfilter` - Unfilter timers from specific regions
 
-Use `!help <command>` for detailed information about a specific command.
-Example: `!help add`"""
+Use `!timerhelp <command>` for detailed information about a specific command.
+Example: `!timerhelp add`"""
         try:
             if command_name:
                 command_name = command_name.lower()
@@ -651,7 +652,7 @@ Use this if the timerboard display becomes out of sync or corrupted.""",
                 if command_name in help_texts:
                     await ctx.send(help_texts[command_name])
                 else:
-                    await ctx.send(f"Command '{command_name}' not found. Use `!help` to see all commands.")
+                    await ctx.send(f"Command '{command_name}' not found. Use `!timerhelp` to see all commands.")
             else:
                 # Show general help
                 help_text = """**Timerbot Commands**
@@ -684,7 +685,7 @@ Use `!help add` for full format details.
 !unfilter
 ```
 
-Use `!help <command>` for detailed information about any command."""
+Use `!timerhelp <command>` for detailed information about any command."""
                 await ctx.send(help_text)
         except Exception as e:
             logger.error(f"Error in help command: {e}")

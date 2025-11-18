@@ -118,10 +118,15 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     
     # Add the cog
     try:
-        # Explicitly remove help command if it exists (in case it was registered)
+        # Explicitly remove help command and any aliases if they exist
         if 'help' in bot.all_commands:
             logger.info(f"Removing existing help command for {server_name}...")
             bot.remove_command('help')
+        # Also try to remove from walk_commands in case it's registered differently
+        for cmd in list(bot.walk_commands()):
+            if cmd.name == 'help' or 'help' in (cmd.aliases or []):
+                logger.info(f"Removing help-related command: {cmd.name} for {server_name}...")
+                bot.remove_command(cmd.name)
         
         logger.info(f"Creating TimerCommands cog for {server_name}...")
         cog = TimerCommands(bot, shared_timerboard)
