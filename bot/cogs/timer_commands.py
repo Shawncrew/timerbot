@@ -89,53 +89,102 @@ class TimerCommands(commands.GroupCog, name="timer"):
         self.timerboard = timerboard
         super().__init__()
 
-    HELP_TEXT = """Invalid format. Please use one of these formats:
+    HELP_TEXT = """**Invalid format. Please use one of these formats:**
 
-1. !add YYYY-MM-DD HH:MM:SS system - structure [tags]
-or
-2. !add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
-or
-3. !add <copy text from selected item> [alliance ticker][structure type][timer type]
-or
-4. !add Merc Den <systemName> <planet> <h> <m> [TAG] (for Mercenary Dens)
+**Format 1: Direct time and description**
+```
+!add YYYY-MM-DD HH:MM:SS system - structure [tags]
+```
+Example: `!add 2024-01-15 14:30:00 Jita - Keepstar [NC][KEEPSTAR][ARMOR]`
 
+**Format 2: Reinforced/Anchoring format**
+```
+!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+```
 Example:
+```
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
 38.4 AU
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+```
 
-Mercenary Den example:
-!add Merc Den Jita Planet I 2 30 [NC]
-or
-!add Merc Den Jita Planet I 2 30 [DECOY]
+**Format 3: Multi-line structure format**
+Copy the structure name, distance, and reinforced line:
+```
+Structure Name
+Distance
+Reinforced until YYYY.MM.DD HH:MM:SS [alliance ticker][structure type][timer type]
+```
+Example:
+```
+4M-QXK - PRIVATE MATSUNOMI P4M3
+38.4 AU
+Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+```
 
-Note: Medium structures should use "HULL" since there is only one timer."""
+**Format 4: Mercenary Den**
+```
+!add Merc Den <systemName> <planet> <hours> <minutes> [TAG]
+```
+Examples:
+- `!add Merc Den Jita Planet I 2 30 [NC]`
+- `!add Merc Den Jita Planet I 2 30 [DECOY]`
+- `!add Merc Den Jita Planet I 2 30` (defaults to [NC] if no tag)
+
+**Tags format:**
+- Alliance ticker: `[NC]`, `[HORDE]`, `[DECOY]`, etc.
+- Structure type: `[KEEPSTAR]`, `[FORTIZAR]`, `[AZBEL]`, `[ATHANOR]`, `[IHUB]`, `[MERCENARY DEN]`, etc.
+- Timer type: `[ARMOR]`, `[HULL]`, `[SHIELD]`
+
+**Note:** Medium structures should use `[HULL]` since there is only one timer."""
 
     @commands.command()
     @commands.check(cmd_channel_check)
     async def add(self, ctx, *, input_text: str):
-        """Add a new timer
+        """Add a new timer to the timerboard.
 
-Format: 
+**Supported formats:**
+
+**1. Direct time format:**
+```
 !add YYYY-MM-DD HH:MM:SS system - structure [tags]
-or
-!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
-or
-!add <copy text from selected item> [alliance ticker][structure type][timer type]
-or
-!add Merc Den <systemName> <planet> <h> <m> [TAG] (for Mercenary Dens)
+```
+Example: `!add 2024-01-15 14:30:00 Jita - Keepstar [NC][KEEPSTAR][ARMOR]`
 
+**2. Reinforced/Anchoring format:**
+```
+!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+```
 Example:
+```
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
 38.4 AU
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
+```
 
-Mercenary Den example:
-!add Merc Den Jita Planet I 2 30 [NC]
-or
-!add Merc Den Jita Planet I 2 30 [DECOY]
+**3. Multi-line structure format (copy from game):**
+Copy structure name, distance, and reinforced line:
+```
+Structure Name
+Distance
+Reinforced until YYYY.MM.DD HH:MM:SS [alliance][structure][timer type]
+```
 
-Note: Medium structures should use "HULL" since there is only one timer."""
+**4. Mercenary Den format:**
+```
+!add Merc Den <systemName> <planet> <hours> <minutes> [TAG]
+```
+Examples:
+- `!add Merc Den Jita Planet I 2 30 [NC]`
+- `!add Merc Den Jita Planet I 2 30 [DECOY]`
+- `!add Merc Den Jita Planet I 2 30` (defaults to [NC] if tag omitted)
+
+**Tags:** `[alliance ticker][structure type][timer type]`
+- Alliance: `[NC]`, `[HORDE]`, `[DECOY]`, etc.
+- Structure: `[KEEPSTAR]`, `[FORTIZAR]`, `[AZBEL]`, `[ATHANOR]`, `[IHUB]`, `[MERCENARY DEN]`, etc.
+- Timer: `[ARMOR]`, `[HULL]`, `[SHIELD]`
+
+**Note:** Medium structures use `[HULL]` only (single timer)."""
         try:
             # Check for Mercenary Den format: !add Merc Den <systemName> <planet> <h> <m> [TAG]
             merc_den_match = re.match(r'^Merc Den\s+([A-Z0-9-]+)\s+([^\s]+)\s+(\d+)\s+(\d+)(?:\s+(\[[^\]]+\]))?\s*$', input_text.strip())
@@ -299,7 +348,19 @@ Note: Medium structures should use "HULL" since there is only one timer."""
     @commands.command()
     @commands.check(cmd_channel_check)
     async def rm(self, ctx, timer_id: int):
-        """Remove a timer by its ID"""
+        """Remove a timer from the timerboard by its ID.
+
+**Usage:**
+```
+!rm <timer_id>
+```
+
+**Example:**
+```
+!rm 1001
+```
+
+The timer ID is shown in parentheses at the end of each timer entry in the timerboard."""
         timer = self.timerboard.remove_timer(timer_id)
         if timer:
             logger.info(f"{ctx.author} removed timer {timer_id}")
@@ -322,7 +383,19 @@ Note: Medium structures should use "HULL" since there is only one timer."""
     @commands.command()
     @commands.check(cmd_channel_check)
     async def refresh(self, ctx):
-        """Refresh the timerboard by clearing and recreating all messages"""
+        """Refresh the timerboard display by clearing and recreating all messages.
+
+**Usage:**
+```
+!refresh
+```
+
+This command will:
+- Delete all existing bot messages in timerboard channels
+- Recreate the timerboard display with current timers
+- Update all configured timerboard channels across all servers
+
+Use this if the timerboard display becomes out of sync or corrupted."""
         try:
             logger.info(f"{ctx.author} requested timerboard refresh")
             
@@ -371,7 +444,28 @@ Note: Medium structures should use "HULL" since there is only one timer."""
     @commands.command()
     @commands.check(cmd_channel_check)
     async def filter(self, ctx):
-        """Filter timers from specific regions: The Kalevala Expanse, Oasa, Cobalt Edge, The Spire, Malpais, Etherium Reach, and Perrigen Falls"""
+        """Filter timers from specific regions to hide them from the timerboard and disable alerts.
+
+**Usage:**
+```
+!filter
+```
+
+**Filtered regions:**
+- The Kalevala Expanse
+- Oasa
+- Cobalt Edge
+- The Spire
+- Malpais
+- Etherium Reach
+- Perrigen Falls
+
+**Effects:**
+- Timers from these regions are hidden from the timerboard display
+- No alerts are sent for filtered timers (60-minute warnings or "timer starting now")
+- Timers remain in the database and can be restored with `!unfilter`
+
+**Note:** This command filters all specified regions at once. Use `!unfilter` to restore them."""
         try:
             regions_to_filter = {
                 'The Kalevala Expanse',
@@ -412,8 +506,98 @@ Note: Medium structures should use "HULL" since there is only one timer."""
 
     @commands.command()
     @commands.check(cmd_channel_check)
+    async def help(self, ctx):
+        """Display help information for all timerbot commands.
+
+**Usage:**
+```
+!help
+```
+or
+```
+!help <command>
+```
+
+**Available commands:**
+- `!add` - Add a new timer (multiple formats supported)
+- `!rm` - Remove a timer by ID
+- `!refresh` - Refresh the timerboard display
+- `!filter` - Filter timers from specific regions
+- `!unfilter` - Unfilter timers from specific regions
+
+Use `!help <command>` for detailed information about a specific command.
+Example: `!help add`"""
+        # Get the command name from the message if provided
+        message_parts = ctx.message.content.split()
+        if len(message_parts) > 1:
+            command_name = message_parts[1].lower()
+            # Find the command
+            command = self.bot.get_command(command_name)
+            if command:
+                help_text = f"**!{command.name}**\n\n{command.help or 'No description available.'}"
+                await ctx.send(help_text)
+            else:
+                await ctx.send(f"Command '{command_name}' not found. Use `!help` to see all commands.")
+        else:
+            # Show general help
+            help_text = """**Timerbot Commands**
+
+**!add** - Add a new timer
+```
+!add YYYY-MM-DD HH:MM:SS system - structure [tags]
+!add system structure Reinforced until YYYY.MM.DD HH:MM:SS [tags]
+!add Merc Den <systemName> <planet> <hours> <minutes> [TAG]
+```
+Use `!help add` for full format details.
+
+**!rm** - Remove a timer by ID
+```
+!rm <timer_id>
+```
+
+**!refresh** - Refresh timerboard display
+```
+!refresh
+```
+
+**!filter** - Filter timers from specific regions (hides from display and disables alerts)
+```
+!filter
+```
+
+**!unfilter** - Unfilter timers from specific regions (restores to display and enables alerts)
+```
+!unfilter
+```
+
+Use `!help <command>` for detailed information about any command."""
+            await ctx.send(help_text)
+
+    @commands.command()
+    @commands.check(cmd_channel_check)
     async def unfilter(self, ctx):
-        """Unfilter timers from specific regions: The Kalevala Expanse, Oasa, Cobalt Edge, The Spire, Malpais, Etherium Reach, and Perrigen Falls"""
+        """Unfilter timers from specific regions to restore them to the timerboard and enable alerts.
+
+**Usage:**
+```
+!unfilter
+```
+
+**Unfiltered regions:**
+- The Kalevala Expanse
+- Oasa
+- Cobalt Edge
+- The Spire
+- Malpais
+- Etherium Reach
+- Perrigen Falls
+
+**Effects:**
+- Timers from these regions are restored to the timerboard display
+- Alerts are re-enabled for unfiltered timers
+- All timers from these regions become visible again
+
+**Note:** This command unfilters all specified regions at once. Use `!filter` to hide them again."""
         try:
             regions_to_unfilter = {
                 'The Kalevala Expanse',
