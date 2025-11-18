@@ -113,16 +113,33 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
             await ctx.send(f"Error executing command: {error}")
     
     # Add the cog
-    cog = TimerCommands(bot, shared_timerboard)
-    await bot.add_cog(cog)
+    try:
+        logger.info(f"Creating TimerCommands cog for {server_name}...")
+        cog = TimerCommands(bot, shared_timerboard)
+        logger.info(f"TimerCommands cog created for {server_name}")
+        
+        logger.info(f"Adding cog to bot for {server_name}...")
+        await bot.add_cog(cog)
+        logger.info(f"Cog added successfully for {server_name}")
+    except Exception as e:
+        logger.error(f"Error adding cog for {server_name}: {e}")
+        logger.exception("Full traceback:")
+        raise
     
     # Move check_timers inside setup_hook
     async def setup_hook():
         """Setup hook for bot initialization"""
-        # Start the timer check loop
-        asyncio.create_task(check_timers())
+        try:
+            logger.info(f"Setup hook called for {server_name}, starting timer check loop...")
+            # Start the timer check loop
+            asyncio.create_task(check_timers())
+            logger.info(f"Timer check loop task created for {server_name}")
+        except Exception as e:
+            logger.error(f"Error in setup_hook for {server_name}: {e}")
+            logger.exception("Full traceback:")
         
     bot.setup_hook = setup_hook
+    logger.info(f"Setup hook configured for {server_name}")
     
     async def check_timers():
         """Check for timers that are about to start and alert if needed"""
@@ -254,13 +271,24 @@ async def main():
         tasks = []
         for server_name, server_config in config['servers'].items():
             if server_config.get('token'):  # Only run if token is configured
-                logger.info(f"Creating bot task for {server_name}...")
-                task = run_bot_instance(server_name, server_config, timerboard)
-                tasks.append(task)
+                try:
+                    logger.info(f"Creating bot task for {server_name}...")
+                    task = run_bot_instance(server_name, server_config, timerboard)
+                    tasks.append(task)
+                    logger.info(f"Bot task created for {server_name}")
+                except Exception as e:
+                    logger.error(f"Error creating bot task for {server_name}: {e}")
+                    logger.exception("Full traceback:")
+                    raise
         
         logger.info(f"Starting {len(tasks)} bot instance(s)...")
         # Run all bots
-        await asyncio.gather(*tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error(f"Error running bot tasks: {e}")
+            logger.exception("Full traceback:")
+            raise
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down...")
     except Exception as e:

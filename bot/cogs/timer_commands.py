@@ -83,7 +83,7 @@ def extract_ticker_from_message(content):
         return '[WA]'
     return '[NC]'
 
-class TimerCommands(commands.GroupCog, name="timer"):
+class TimerCommands(commands.Cog, name="timer"):
     def __init__(self, bot, timerboard):
         self.bot = bot
         self.timerboard = timerboard
