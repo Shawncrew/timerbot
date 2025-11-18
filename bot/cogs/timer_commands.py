@@ -97,7 +97,7 @@ or
 or
 3. !add <copy text from selected item> [alliance ticker][structure type][timer type]
 or
-4. !add Merc Den <systemName> <planet> <h> <m> (for Mercenary Dens)
+4. !add Merc Den <systemName> <planet> <h> <m> [TAG] (for Mercenary Dens)
 
 Example:
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
@@ -105,7 +105,9 @@ Example:
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
 
 Mercenary Den example:
-!add Merc Den Jita Planet I 2 30
+!add Merc Den Jita Planet I 2 30 [NC]
+or
+!add Merc Den Jita Planet I 2 30 [DECOY]
 
 Note: Medium structures should use "HULL" since there is only one timer."""
 
@@ -121,7 +123,7 @@ or
 or
 !add <copy text from selected item> [alliance ticker][structure type][timer type]
 or
-!add Merc Den <systemName> <planet> <h> <m> (for Mercenary Dens)
+!add Merc Den <systemName> <planet> <h> <m> [TAG] (for Mercenary Dens)
 
 Example:
 !add 4M-QXK - PRIVATE MATSUNOMI P4M3
@@ -129,24 +131,31 @@ Example:
 Reinforced until 2024.01.01 01:08:33 [HORDE][ATHANOR][HULL]
 
 Mercenary Den example:
-!add Merc Den Jita Planet I 2 30
+!add Merc Den Jita Planet I 2 30 [NC]
+or
+!add Merc Den Jita Planet I 2 30 [DECOY]
 
 Note: Medium structures should use "HULL" since there is only one timer."""
         try:
-            # Check for Mercenary Den format: !add Merc Den <systemName> <planet> <h> <m>
-            merc_den_match = re.match(r'^Merc Den\s+([A-Z0-9-]+)\s+([^\s]+)\s+(\d+)\s+(\d+)\s*$', input_text.strip())
+            # Check for Mercenary Den format: !add Merc Den <systemName> <planet> <h> <m> [TAG]
+            merc_den_match = re.match(r'^Merc Den\s+([A-Z0-9-]+)\s+([^\s]+)\s+(\d+)\s+(\d+)(?:\s+(\[[^\]]+\]))?\s*$', input_text.strip())
             if merc_den_match:
                 system = merc_den_match.group(1)
                 planet = merc_den_match.group(2)
                 hours = int(merc_den_match.group(3))
                 minutes = int(merc_den_match.group(4))
+                alliance_tag = merc_den_match.group(5)  # Optional alliance tag like [NC] or [DECOY]
+                
+                # Default to [NC] if no tag provided
+                if not alliance_tag:
+                    alliance_tag = "[NC]"
                 
                 # Calculate timer time (current time + hours + minutes)
                 now = datetime.datetime.now(EVE_TZ)
                 timer_time = now + datetime.timedelta(hours=hours, minutes=minutes)
                 
                 # Create description for Mercenary Den
-                description = f"{system} - {planet} [NC][MERCENARY DEN]"
+                description = f"{system} - {planet} {alliance_tag}[MERCENARY DEN]"
                 
                 new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
                 
