@@ -159,6 +159,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
         """Check for timers that are about to start and alert if needed"""
         await bot.wait_until_ready()
         logger.info(f"Starting timer check loop for {server_name}...")
+        logger.info(f"Filtered regions for {server_name}: {shared_timerboard.filtered_regions}")
         
         sixty_min_alerted = set()  # Track 60-minute alerts
         start_time_alerted = set()  # Track start-time alerts
@@ -204,12 +205,19 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     logger.info(f"  Already alerted start: {timer.timer_id in start_time_alerted}")
                     
                     # Check if timer is in a filtered region (skip alerts if filtered)
-                    filtered_regions_upper = {r.upper() for r in shared_timerboard.filtered_regions}
-                    is_filtered = timer.region and timer.region.upper() in filtered_regions_upper
-                    
-                    if is_filtered:
-                        logger.info(f"  Timer is in filtered region '{timer.region}', skipping alerts")
-                        continue
+                    # Normalize both timer region and filtered regions for comparison
+                    if shared_timerboard.filtered_regions:
+                        filtered_regions_upper = {r.upper().strip() for r in shared_timerboard.filtered_regions if r}
+                        timer_region_upper = timer.region.upper().strip() if timer.region else None
+                        is_filtered = timer_region_upper and timer_region_upper in filtered_regions_upper
+                        
+                        if is_filtered:
+                            logger.info(f"  Timer {timer.timer_id} ({timer.system}) is in filtered region '{timer.region}' (normalized: '{timer_region_upper}'), skipping alerts")
+                            continue
+                        else:
+                            logger.debug(f"  Timer {timer.timer_id} region '{timer.region}' (normalized: '{timer_region_upper}') not in filtered regions: {filtered_regions_upper}")
+                    else:
+                        logger.debug(f"  No filtered regions set, allowing all alerts")
                     
                     # Alert at 60 minutes if not already alerted
                     if 59.0 <= time_until <= 61.0:  # ±1 minute window for 60-minute alert

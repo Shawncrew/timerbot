@@ -301,13 +301,16 @@ Examples:
                     else:
                         description = input_text
                 else:
-                    # Try to parse the first part as a direct time input
-                    parts = input_text.split(' ', 1)
-                    if len(parts) < 2:
+                    # Try to parse the direct time input format: YYYY-MM-DD HH:MM:SS <description>
+                    direct_time_match = re.match(
+                        r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(.+)$',
+                        input_text.strip()
+                    )
+                    if not direct_time_match:
                         await ctx.send(self.HELP_TEXT)
                         return
-                    time_str = parts[0]
-                    description = parts[1]
+                    time_str = direct_time_match.group(1)
+                    description = direct_time_match.group(2)
 
             # Parse the time
             try:
