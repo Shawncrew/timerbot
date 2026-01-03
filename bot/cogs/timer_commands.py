@@ -1312,6 +1312,19 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     
     logger.info(f"[SKYHOOK-BACKFILL] ✅ Found skyhooks channel: #{channel.name} (ID: {channel_id}) in guild: {channel.guild.name}")
     
+    # Check bot permissions for the skyhooks channel
+    perms = channel.permissions_for(channel.guild.me)
+    logger.info(f"[SKYHOOK-BACKFILL] Bot permissions for #{channel.name}:")
+    logger.info(f"[SKYHOOK-BACKFILL]   - Can view channel: {perms.view_channel}")
+    logger.info(f"[SKYHOOK-BACKFILL]   - Can read message history: {perms.read_message_history}")
+    logger.info(f"[SKYHOOK-BACKFILL]   - Can read messages: {perms.read_messages}")
+    
+    if not perms.read_message_history:
+        logger.error(f"[SKYHOOK-BACKFILL] ❌ Bot does not have permission to read message history in #{channel.name}")
+        if cmd_channel:
+            await cmd_channel.send("❌ Skyhook backfill failed: Bot does not have permission to read message history.")
+        return
+    
     if not cmd_channel:
         logger.warning(f"[SKYHOOK-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id}) for backfill notifications.")
     else:
@@ -1327,12 +1340,19 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     
     now = datetime.datetime.now(pytz.UTC)
     three_days_ago = now - datetime.timedelta(days=3)
+    logger.info(f"[SKYHOOK-BACKFILL] Checking messages from {three_days_ago} to {now}")
     added = 0
     already = 0
     failed = 0
     details = []
-    async for message in channel.history(limit=1000, after=three_days_ago):
-        content = message.content
+    message_count = 0
+    logger.info(f"[SKYHOOK-BACKFILL] Starting to iterate through channel history...")
+    try:
+        async for message in channel.history(limit=1000, after=three_days_ago):
+            message_count += 1
+            if message_count % 50 == 0:
+                logger.info(f"[SKYHOOK-BACKFILL] Processed {message_count} messages so far...")
+            content = message.content
         # If content is empty or doesn't contain keywords, try to extract from embed
         if (not content or "Skyhook lost shield" not in content) and message.embeds:
             embed = message.embeds[0]
@@ -1407,6 +1427,17 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                 logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from message: {content}")
         else:
             logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
+    except Exception as e:
+        logger.error(f"[SKYHOOK-BACKFILL] ❌ Error iterating through messages: {e}")
+        logger.exception("Full traceback:")
+    
+    logger.info(f"[SKYHOOK-BACKFILL] Finished processing {message_count} total messages from channel history")
+    
+    if message_count == 0:
+        logger.warning(f"[SKYHOOK-BACKFILL] ⚠️  No messages found in the last 3 days in #{channel.name}")
+        if cmd_channel:
+            await cmd_channel.send("⚠️ Skyhook backfill: No messages found in the last 3 days.")
+    
     # Send summary
     logger.info(f"[SKYHOOK-BACKFILL] Processing complete. Results: {added} added, {already} already present, {failed} failed")
     if cmd_channel:

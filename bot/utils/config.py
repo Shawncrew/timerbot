@@ -92,7 +92,11 @@ def load_config():
                         loaded_config['servers'][server][channel] = None
                         logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
                     else:
-                        logger.info(f"Found channel '{channel}' in {server} with ID: {loaded_config['servers'][server][channel]}")
+                        channel_value = loaded_config['servers'][server][channel]
+                        logger.info(f"Found channel '{channel}' in {server} with ID: {channel_value} (type: {type(channel_value)})")
+            
+            # Log final config for debugging
+            logger.info(f"Final loaded config servers: {loaded_config.get('servers', {})}")
             
             return loaded_config
                 

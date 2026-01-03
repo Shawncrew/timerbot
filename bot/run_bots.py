@@ -110,7 +110,12 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 logger.info(f"[BACKFILL] ⚠️  SOV channel not configured for {server_name}, skipping SOV backfill")
             
             # Skyhook Backfill
+            logger.info(f"[BACKFILL] Checking server_config for skyhooks key...")
+            logger.info(f"[BACKFILL] server_config keys: {list(server_config.keys())}")
+            logger.info(f"[BACKFILL] server_config.get('skyhooks'): {server_config.get('skyhooks')}")
+            logger.info(f"[BACKFILL] server_config.get('skyhooks') type: {type(server_config.get('skyhooks'))}")
             skyhook_channel_id = server_config.get('skyhooks')
+            logger.info(f"[BACKFILL] skyhook_channel_id value: {skyhook_channel_id}, truthy: {bool(skyhook_channel_id)}")
             if skyhook_channel_id:
                 logger.info(f"[BACKFILL] Checking Skyhook backfill for {server_name}...")
                 skyhook_channel = bot.get_channel(skyhook_channel_id)
