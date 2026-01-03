@@ -1057,16 +1057,28 @@ Use `!timerhelp <command>` for detailed information about any command."""
 
 async def backfill_citadel_timers(bot, timerboard, server_config):
     """Backfill timers from the last 5 days of citadel-attacked channel messages."""
+    logger.info(f"[CITADEL-BACKFILL] ========== Starting Structure Backfill ==========")
+    logger.info(f"[CITADEL-BACKFILL] Server config: {server_config}")
     channel_id = server_config.get('citadel_attacked')
     cmd_channel_id = server_config.get('commands')
     if not channel_id:
-        logger.info("No citadel_attacked channel configured for backfill.")
+        logger.warning(f"[CITADEL-BACKFILL] No citadel_attacked channel configured for backfill.")
         return
+    
+    logger.info(f"[CITADEL-BACKFILL] Looking for citadel_attacked channel with ID: {channel_id}")
     channel = bot.get_channel(channel_id)
+    logger.info(f"[CITADEL-BACKFILL] Looking for commands channel with ID: {cmd_channel_id}")
     cmd_channel = bot.get_channel(cmd_channel_id)
+    
     if not channel:
-        logger.warning(f"Could not find citadel_attacked channel for backfill.")
+        logger.error(f"[CITADEL-BACKFILL] ❌ Could not find citadel_attacked channel (ID: {channel_id}) for backfill.")
         return
+    
+    logger.info(f"[CITADEL-BACKFILL] ✅ Found citadel channel: #{channel.name} (ID: {channel_id}) in guild: {channel.guild.name}")
+    if cmd_channel:
+        logger.info(f"[CITADEL-BACKFILL] ✅ Found commands channel: #{cmd_channel.name} (ID: {cmd_channel_id})")
+    else:
+        logger.warning(f"[CITADEL-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id})")
     now = datetime.datetime.now(pytz.UTC)
     five_days_ago = now - datetime.timedelta(days=5)
     added = 0
@@ -1148,28 +1160,46 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
         else:
             logger.info(f"[BACKFILL] Message does not contain relevant keywords. Skipping.")
     # Send summary
+    logger.info(f"[CITADEL-BACKFILL] Processing complete. Results: {added} added, {already} already present, {failed} failed")
     if cmd_channel:
-        summary = (
-            f"Structure backfill complete: {added} timers added, {already} already present, {failed} failed."
-        )
-        if added > 0:
-            summary += "\nAdded timers:\n" + "\n".join(details)
-        await cmd_channel.send(summary)
-    logger.info(f"Structure backfill summary: {added} added, {already} already present, {failed} failed.") 
+        try:
+            summary = (
+                f"Structure backfill complete: {added} timers added, {already} already present, {failed} failed."
+            )
+            if added > 0:
+                summary += "\nAdded timers:\n" + "\n".join(details)
+            await cmd_channel.send(summary)
+            logger.info(f"[CITADEL-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
+        except Exception as e:
+            logger.error(f"[CITADEL-BACKFILL] ❌ Error sending summary: {e}")
+    else:
+        logger.warning(f"[CITADEL-BACKFILL] ⚠️  No commands channel found, skipping summary message")
+    logger.info(f"[CITADEL-BACKFILL] ========== Structure Backfill Complete ==========") 
 
 async def backfill_sov_timers(bot, timerboard, server_config):
     """Backfill timers from the last 5 days of sov channel messages."""
-    logger.info(f"[SOV-BACKFILL] Running SOV backfill for server config: {server_config}")
+    logger.info(f"[SOV-BACKFILL] ========== Starting SOV Backfill ==========")
+    logger.info(f"[SOV-BACKFILL] Server config: {server_config}")
     channel_id = server_config.get('sov')
     cmd_channel_id = server_config.get('commands')
     if not channel_id:
-        logger.info("No sov channel configured for backfill.")
+        logger.warning(f"[SOV-BACKFILL] No sov channel configured for backfill.")
         return
+    
+    logger.info(f"[SOV-BACKFILL] Looking for sov channel with ID: {channel_id}")
     channel = bot.get_channel(channel_id)
+    logger.info(f"[SOV-BACKFILL] Looking for commands channel with ID: {cmd_channel_id}")
     cmd_channel = bot.get_channel(cmd_channel_id)
+    
     if not channel:
-        logger.warning(f"Could not find sov channel for backfill.")
+        logger.error(f"[SOV-BACKFILL] ❌ Could not find sov channel (ID: {channel_id}) for backfill.")
         return
+    
+    logger.info(f"[SOV-BACKFILL] ✅ Found sov channel: #{channel.name} (ID: {channel_id}) in guild: {channel.guild.name}")
+    if cmd_channel:
+        logger.info(f"[SOV-BACKFILL] ✅ Found commands channel: #{cmd_channel.name} (ID: {cmd_channel_id})")
+    else:
+        logger.warning(f"[SOV-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id})")
     now = datetime.datetime.now(pytz.UTC)
     five_days_ago = now - datetime.timedelta(days=5)
     added = 0
@@ -1260,25 +1290,40 @@ async def backfill_sov_timers(bot, timerboard, server_config):
 
 async def backfill_skyhook_timers(bot, timerboard, server_config):
     """Backfill timers from the last 3 days of skyhooks channel messages."""
-    logger.info(f"[SKYHOOK-BACKFILL] Running Skyhook backfill for server config: {server_config}")
+    logger.info(f"[SKYHOOK-BACKFILL] ========== Starting Skyhook Backfill ==========")
+    logger.info(f"[SKYHOOK-BACKFILL] Server config: {server_config}")
     channel_id = server_config.get('skyhooks')
     cmd_channel_id = server_config.get('commands')
+    
     if not channel_id:
-        logger.info("No skyhooks channel configured for backfill.")
+        logger.warning(f"[SKYHOOK-BACKFILL] No skyhooks channel configured for backfill.")
         return
+    
+    logger.info(f"[SKYHOOK-BACKFILL] Looking for skyhooks channel with ID: {channel_id}")
     channel = bot.get_channel(channel_id)
+    logger.info(f"[SKYHOOK-BACKFILL] Looking for commands channel with ID: {cmd_channel_id}")
     cmd_channel = bot.get_channel(cmd_channel_id)
+    
     if not channel:
-        logger.warning(f"Could not find skyhooks channel for backfill.")
+        logger.error(f"[SKYHOOK-BACKFILL] ❌ Could not find skyhooks channel (ID: {channel_id}) for backfill.")
         if cmd_channel:
             await cmd_channel.send("❌ Skyhook backfill failed: Could not find skyhooks channel.")
         return
+    
+    logger.info(f"[SKYHOOK-BACKFILL] ✅ Found skyhooks channel: #{channel.name} (ID: {channel_id}) in guild: {channel.guild.name}")
+    
     if not cmd_channel:
-        logger.warning(f"Could not find commands channel for backfill notifications.")
+        logger.warning(f"[SKYHOOK-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id}) for backfill notifications.")
+    else:
+        logger.info(f"[SKYHOOK-BACKFILL] ✅ Found commands channel: #{cmd_channel.name} (ID: {cmd_channel_id})")
     
     # Send start message to commands channel
     if cmd_channel:
-        await cmd_channel.send("🔄 Starting Skyhook backfill (checking last 3 days)...")
+        try:
+            await cmd_channel.send("🔄 Starting Skyhook backfill (checking last 3 days)...")
+            logger.info(f"[SKYHOOK-BACKFILL] Sent start message to commands channel")
+        except Exception as e:
+            logger.error(f"[SKYHOOK-BACKFILL] Failed to send start message: {e}")
     
     now = datetime.datetime.now(pytz.UTC)
     three_days_ago = now - datetime.timedelta(days=3)
@@ -1363,6 +1408,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
         else:
             logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
     # Send summary
+    logger.info(f"[SKYHOOK-BACKFILL] Processing complete. Results: {added} added, {already} already present, {failed} failed")
     if cmd_channel:
         try:
             summary = (
@@ -1371,12 +1417,12 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             if added > 0:
                 summary += "\nAdded timers:\n" + "\n".join(details)
             await cmd_channel.send(summary)
-            logger.info(f"Sent skyhook backfill summary to commands channel")
+            logger.info(f"[SKYHOOK-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
         except Exception as e:
-            logger.error(f"Error sending skyhook backfill summary: {e}")
+            logger.error(f"[SKYHOOK-BACKFILL] ❌ Error sending summary: {e}")
     else:
-        logger.warning("No commands channel found, skipping summary message")
-    logger.info(f"Skyhook Backfill summary: {added} added, {already} already present, {failed} failed.")
+        logger.warning(f"[SKYHOOK-BACKFILL] ⚠️  No commands channel found, skipping summary message")
+    logger.info(f"[SKYHOOK-BACKFILL] ========== Skyhook Backfill Complete ==========")
 
 async def update_existing_ihub_timers_with_alert(timerboard):
     """Retroactively update IHUB timers in alert regions to include the shield and alert emoji."""

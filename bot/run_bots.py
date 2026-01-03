@@ -61,36 +61,100 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                     perms = channel.permissions_for(guild.me)
                     logger.info(f"    Can view: {perms.view_channel}, Can send: {perms.send_messages}, Can read: {perms.read_messages}")
 
-            # Check and log all configured channels, including sov
+            # Check and log all configured channels, including sov and skyhooks
+            logger.info(f"Checking configured channels for {server_name}:")
+            channels_found = {}
+            channels_missing = {}
             for channel_name, channel_id in server_config.items():
-                if isinstance(channel_id, int):
+                if channel_name == 'token':
+                    continue  # Skip token
+                if isinstance(channel_id, int) and channel_id is not None:
                     channel = bot.get_channel(channel_id)
                     if channel:
-                        logger.info(f"Found channel '{channel_name}' in {server_name} with ID: {channel_id}")
+                        channels_found[channel_name] = channel_id
+                        perms = channel.permissions_for(channel.guild.me)
+                        logger.info(f"✅ Found channel '{channel_name}' in {server_name}: #{channel.name} (ID: {channel_id})")
+                        logger.info(f"   Permissions - Can view: {perms.view_channel}, Can send: {perms.send_messages}, Can read: {perms.read_messages}")
                     else:
+                        channels_missing[channel_name] = channel_id
                         logger.error(f"❌ Could not find {channel_name} channel (ID: {channel_id}) for {server_name}")
-
+                elif channel_id is None:
+                    logger.info(f"⚠️  Channel '{channel_name}' not configured for {server_name} (set to None)")
+            
+            logger.info(f"Channel check summary for {server_name}: {len(channels_found)} found, {len(channels_missing)} missing")
+            
             logger.info("""
 ====================================================
-   STARTING SOV BACKFILL FOR THIS SERVER
+   STARTING BACKFILLS FOR THIS SERVER
 ====================================================
 """)
-            if server_config.get('sov'):
-                logger.info(f"Running SOV backfill for {server_name}...")
-                await backfill_sov_timers(bot, shared_timerboard, server_config)
-                await update_existing_ihub_timers_with_alert(shared_timerboard)
             
-            # Run skyhook backfill for each server with a skyhooks channel
-            if server_config.get('skyhooks'):
-                logger.info(f"Running Skyhook backfill for {server_name}...")
-                await backfill_skyhook_timers(bot, shared_timerboard, server_config)
+            # SOV Backfill
+            sov_channel_id = server_config.get('sov')
+            if sov_channel_id:
+                logger.info(f"[BACKFILL] Checking SOV backfill for {server_name}...")
+                sov_channel = bot.get_channel(sov_channel_id)
+                if sov_channel:
+                    logger.info(f"[BACKFILL] ✅ SOV channel found: #{sov_channel.name} (ID: {sov_channel_id})")
+                    logger.info(f"[BACKFILL] Running SOV backfill for {server_name}...")
+                    try:
+                        await backfill_sov_timers(bot, shared_timerboard, server_config)
+                        await update_existing_ihub_timers_with_alert(shared_timerboard)
+                        logger.info(f"[BACKFILL] ✅ SOV backfill completed for {server_name}")
+                    except Exception as e:
+                        logger.error(f"[BACKFILL] ❌ SOV backfill failed for {server_name}: {e}")
+                        logger.exception("Full traceback:")
+                else:
+                    logger.error(f"[BACKFILL] ❌ SOV channel not found (ID: {sov_channel_id}) for {server_name}, skipping SOV backfill")
+            else:
+                logger.info(f"[BACKFILL] ⚠️  SOV channel not configured for {server_name}, skipping SOV backfill")
+            
+            # Skyhook Backfill
+            skyhook_channel_id = server_config.get('skyhooks')
+            if skyhook_channel_id:
+                logger.info(f"[BACKFILL] Checking Skyhook backfill for {server_name}...")
+                skyhook_channel = bot.get_channel(skyhook_channel_id)
+                if skyhook_channel:
+                    logger.info(f"[BACKFILL] ✅ Skyhook channel found: #{skyhook_channel.name} (ID: {skyhook_channel_id})")
+                    logger.info(f"[BACKFILL] Running Skyhook backfill for {server_name}...")
+                    try:
+                        await backfill_skyhook_timers(bot, shared_timerboard, server_config)
+                        logger.info(f"[BACKFILL] ✅ Skyhook backfill completed for {server_name}")
+                    except Exception as e:
+                        logger.error(f"[BACKFILL] ❌ Skyhook backfill failed for {server_name}: {e}")
+                        logger.exception("Full traceback:")
+                else:
+                    logger.error(f"[BACKFILL] ❌ Skyhook channel not found (ID: {skyhook_channel_id}) for {server_name}, skipping Skyhook backfill")
+            else:
+                logger.info(f"[BACKFILL] ⚠️  Skyhook channel not configured for {server_name}, skipping Skyhook backfill")
             
             # Register this bot with the timerboard
             shared_timerboard.register_bot(bot, server_config)
             
-            # Backfill timers from citadel-attacked channel
-            logger.info(f"Starting backfill for {server_name}")
-            await backfill_citadel_timers(bot, shared_timerboard, server_config)
+            # Citadel/Structure Backfill
+            citadel_channel_id = server_config.get('citadel_attacked')
+            if citadel_channel_id:
+                logger.info(f"[BACKFILL] Checking Structure backfill for {server_name}...")
+                citadel_channel = bot.get_channel(citadel_channel_id)
+                if citadel_channel:
+                    logger.info(f"[BACKFILL] ✅ Citadel channel found: #{citadel_channel.name} (ID: {citadel_channel_id})")
+                    logger.info(f"[BACKFILL] Running Structure backfill for {server_name}...")
+                    try:
+                        await backfill_citadel_timers(bot, shared_timerboard, server_config)
+                        logger.info(f"[BACKFILL] ✅ Structure backfill completed for {server_name}")
+                    except Exception as e:
+                        logger.error(f"[BACKFILL] ❌ Structure backfill failed for {server_name}: {e}")
+                        logger.exception("Full traceback:")
+                else:
+                    logger.error(f"[BACKFILL] ❌ Citadel channel not found (ID: {citadel_channel_id}) for {server_name}, skipping Structure backfill")
+            else:
+                logger.info(f"[BACKFILL] ⚠️  Citadel channel not configured for {server_name}, skipping Structure backfill")
+            
+            logger.info(f"""
+====================================================
+   BACKFILLS COMPLETED FOR {server_name}
+====================================================
+""")
             
             # Initial timerboard update
             logger.info(f"Performing initial timerboard update for {server_name}")
