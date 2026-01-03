@@ -219,7 +219,8 @@ async def on_ready():
                 'commands': (server_config['commands'], True),
                 'citadel_attacked': (server_config['citadel_attacked'], False),
                 'citadel_info': (server_config['citadel_info'], False),
-                'sov': (server_config.get('sov'), False)
+                'sov': (server_config.get('sov'), False),
+                'skyhooks': (server_config.get('skyhooks'), False)
             }
             
             # Check all channels

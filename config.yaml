@@ -7,6 +7,7 @@ servers:
     citadel_attacked: 1092818946895384576  # Channel for citadel attack notifications
     citadel_info: 1092818260937953330  # Channel for citadel status updates
     sov: 1092823745778962442  # Channel for sov notifications
+    skyhooks: 1092823070651207740  # Channel for skyhook reinforcement notifications
   server2:  # Second Discord
     token: ${SECOND_BOT_TOKEN}  # Reference environment variable
     timerboard: 1371980890397343885  # Channel where timer list is displayed

@@ -16,13 +16,15 @@ def load_config():
                 'timerboard': None,
                 'commands': None,
                 'citadel_attacked': None,
-                'citadel_info': None
+                'citadel_info': None,
+                'skyhooks': None
             },
             'server2': {
                 'timerboard': None,
                 'commands': None,
                 'citadel_attacked': None,
-                'citadel_info': None
+                'citadel_info': None,
+                'skyhooks': None
             }
         }
     }

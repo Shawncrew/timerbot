@@ -876,6 +876,66 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     else:
                         logger.info(f"[SOV] No match for Infrastructure Hub reinforced pattern in content: {content}")
                     break
+                # --- Skyhook channel logic ---
+                if message.channel.id == server_config.get('skyhooks'):
+                    logger.info(f"[SKYHOOK] Received message in skyhooks channel: {message.id} | Author: {message.author} | Content: {message.content} | Embeds: {len(message.embeds)}")
+                    content = message.content
+                    # If content is empty or doesn't contain keywords, try to extract from embed
+                    if (not content or "Skyhook lost shield" not in content) and message.embeds:
+                        embed = message.embeds[0]
+                        embed_text = []
+                        if embed.title:
+                            embed_text.append(embed.title)
+                        if embed.description:
+                            embed_text.append(embed.description)
+                        for field in getattr(embed, 'fields', []):
+                            embed_text.append(f"{field.name} {field.value}")
+                        content = "\n".join(embed_text)
+                        logger.info(f"[SKYHOOK] Extracted embed content: {content}")
+                    else:
+                        logger.info(f"[SKYHOOK] Using message content for parsing: {content}")
+                    # Check for "Skyhook lost shield" indicator
+                    if "Skyhook lost shield" in content:
+                        logger.info(f"[SKYHOOK] Found 'Skyhook lost shield' in message")
+                        # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
+                        # Pattern: "The Orbital Skyhook at <system> <planet> in <system>"
+                        # Also handle variations like "at 1-EVAX III" or "at 1-EVAX Planet III"
+                        skyhook_match = re.search(r'The Orbital Skyhook at\s+([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)\s+in\s+([A-Z0-9-]+)', content, re.IGNORECASE)
+                        if skyhook_match:
+                            system = skyhook_match.group(1).strip()
+                            planet = skyhook_match.group(2).strip()
+                            logger.info(f"[SKYHOOK] Matched system: {system}, planet: {planet}")
+                            # Extract timer time from "reinforcement state until : 2025-11-14 21:52"
+                            timer_match = re.search(r'reinforcement state until\s*:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                            if timer_match:
+                                timer_time_str = timer_match.group(1)
+                                try:
+                                    timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                                    timer_time = EVE_TZ.localize(timer_time)
+                                except Exception as e:
+                                    logger.warning(f"[SKYHOOK] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                                    return
+                                # Build description with [NC][Skyhook][Final] tags
+                                tags = "[NC][Skyhook][Final]"
+                                structure_name = f"Orbital Skyhook Planet {planet}"
+                                description = f"{system} - {structure_name} {tags}"
+                                new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                                logger.info(f"[SKYHOOK] Added timer: {description} at {timer_time}")
+                                # Notify command channel
+                                cmd_channel = self.bot.get_channel(server_config['commands'])
+                                if cmd_channel:
+                                    add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                                    await cmd_channel.send(
+                                        f"✅ Auto-added Skyhook timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
+                                    )
+                                logger.info(f"Auto-added timer from skyhooks: {description}")
+                            else:
+                                logger.warning(f"[SKYHOOK] Could not find timer time in message: {content}")
+                        else:
+                            logger.warning(f"[SKYHOOK] Could not parse system and planet from message: {content}")
+                    else:
+                        logger.info(f"[SKYHOOK] No match for 'Skyhook lost shield' pattern in content: {content}")
+                    break
         except Exception as e:
             logger.error(f"Error processing citadel-attacked message: {e}")
 
