@@ -13,7 +13,7 @@ from bot.utils.config import load_config, CONFIG
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands, backfill_citadel_timers
-from bot.cogs.timer_commands import backfill_sov_timers
+from bot.cogs.timer_commands import backfill_sov_timers, backfill_skyhook_timers
 from bot.cogs.timer_commands import update_existing_ihub_timers_with_alert
 from bot.utils.helpers import clean_system_name
 
@@ -79,6 +79,11 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                 logger.info(f"Running SOV backfill for {server_name}...")
                 await backfill_sov_timers(bot, shared_timerboard, server_config)
                 await update_existing_ihub_timers_with_alert(shared_timerboard)
+            
+            # Run skyhook backfill for each server with a skyhooks channel
+            if server_config.get('skyhooks'):
+                logger.info(f"Running Skyhook backfill for {server_name}...")
+                await backfill_skyhook_timers(bot, shared_timerboard, server_config)
             
             # Register this bot with the timerboard
             shared_timerboard.register_bot(bot, server_config)

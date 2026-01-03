@@ -14,7 +14,7 @@ from bot.utils.config import load_config
 from bot.utils.logger import logger
 from bot.models.timer import TimerBoard, EVE_TZ
 from bot.cogs.timer_commands import TimerCommands
-from bot.cogs.timer_commands import backfill_sov_timers
+from bot.cogs.timer_commands import backfill_sov_timers, backfill_skyhook_timers
 from bot.utils.helpers import clean_system_name
 
 # Initialize logger and show startup banner
@@ -272,6 +272,10 @@ async def on_ready():
             if server_config.get('sov'):
                 logger.info(f"Running SOV backfill for {server_name}...")
                 await backfill_sov_timers(bot, timerboard, server_config)
+            # Run skyhook backfill for each server with a skyhooks channel
+            if server_config.get('skyhooks'):
+                logger.info(f"Running Skyhook backfill for {server_name}...")
+                await backfill_skyhook_timers(bot, timerboard, server_config)
     except Exception as e:
         logger.error(f"Error in on_ready: {e}")
         logger.exception("Full traceback:")
