@@ -1354,6 +1354,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     failed = 0
     details = []
     message_count = 0
+    # Collect timers to add (without updating timerboard immediately)
+    timers_to_add = []
     logger.info(f"[SKYHOOK-BACKFILL] Starting to iterate through channel history...")
     try:
         async for message in channel.history(limit=1000, after=three_days_ago):
@@ -1428,17 +1430,17 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                             logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}")
                             already += 1
                             continue
-                        # Add timer
-                        try:
-                            new_timer, _ = await timerboard.add_timer(timer_time, description)
-                            logger.info(f"[SKYHOOK-BACKFILL] Added timer: {description} at {timer_time}")
-                            added += 1
-                            add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
-                            details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
-                        except Exception as e:
-                            logger.warning(f"[SKYHOOK-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
-                            failed += 1
-                            continue
+                        # Collect timer to add later (don't add immediately)
+                        timers_to_add.append({
+                            'time': timer_time,
+                            'description': description,
+                            'system': system,
+                            'structure_name': structure_name,
+                            'tags': tags
+                        })
+                        logger.info(f"[SKYHOOK-BACKFILL] Collected timer to add: {description} at {timer_time}")
+                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
                     else:
                         logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in message: {content}")
                 else:
@@ -1450,11 +1452,78 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
         logger.exception("Full traceback:")
     
     logger.info(f"[SKYHOOK-BACKFILL] Finished processing {message_count} total messages from channel history")
+    logger.info(f"[SKYHOOK-BACKFILL] Collected {len(timers_to_add)} timers to add")
     
     if message_count == 0:
         logger.warning(f"[SKYHOOK-BACKFILL] ⚠️  No messages found in the last 3 days in #{channel.name}")
         if cmd_channel:
             await cmd_channel.send("⚠️ Skyhook backfill: No messages found in the last 3 days.")
+    
+    # Now process all collected timers: verify they're still current, then add them
+    now_utc = datetime.datetime.now(EVE_TZ)
+    from bot.models.timer import Timer
+    from bot.utils.eve_data import get_region
+    
+    logger.info(f"[SKYHOOK-BACKFILL] Verifying {len(timers_to_add)} collected timers are still current...")
+    for timer_data in timers_to_add:
+        # Double-check timer is still current (not expired)
+        if timer_data['time'] < now_utc:
+            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {timer_data['description']} at {timer_data['time']}")
+            failed += 1
+            continue
+        
+        # Check for duplicates again (in case something changed during processing)
+        duplicate = False
+        for t in timerboard.timers:
+            if (
+                t.system.upper() == timer_data['system'].upper()
+                and t.structure_name.upper() == timer_data['structure_name'].upper()
+                and abs((t.time - timer_data['time']).total_seconds()) < 60
+            ):
+                duplicate = True
+                break
+        
+        if duplicate:
+            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {timer_data['description']} at {timer_data['time']}")
+            already += 1
+            continue
+        
+        # Add timer directly to timerboard (without triggering update)
+        try:
+            region = get_region(timer_data['system'])
+            new_timer = Timer(
+                time=timer_data['time'],
+                description=timer_data['description'],
+                timer_id=timerboard.next_id,
+                system=timer_data['system'],
+                structure_name=timer_data['structure_name'],
+                notes=timer_data['tags'],
+                region=region
+            )
+            timerboard.timers.append(new_timer)
+            timerboard.next_id += 1
+            added += 1
+            logger.info(f"[SKYHOOK-BACKFILL] Added timer: {timer_data['description']} at {timer_data['time']} (ID: {new_timer.timer_id})")
+        except Exception as e:
+            logger.warning(f"[SKYHOOK-BACKFILL] Failed to add timer: {timer_data['description']} at {timer_data['time']} | Error: {e}")
+            failed += 1
+            continue
+    
+    # Sort timers and save data
+    if added > 0:
+        timerboard.sort_timers()
+        timerboard.save_data()
+        logger.info(f"[SKYHOOK-BACKFILL] Saved {added} new timers to timerboard")
+        
+        # Update timerboard once at the end
+        logger.info(f"[SKYHOOK-BACKFILL] Updating timerboard display...")
+        timerboard_channels = [
+            bot.get_channel(server_config['timerboard'])
+            for server_config in CONFIG['servers'].values()
+            if server_config.get('timerboard') is not None
+        ]
+        await timerboard.update_timerboard(timerboard_channels)
+        logger.info(f"[SKYHOOK-BACKFILL] ✅ Timerboard updated with {added} new timers")
     
     # Send summary
     logger.info(f"[SKYHOOK-BACKFILL] Processing complete. Results: {added} added, {already} already present, {failed} failed")
