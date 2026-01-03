@@ -1338,14 +1338,6 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     else:
         logger.info(f"[SKYHOOK-BACKFILL] ✅ Found commands channel: #{cmd_channel.name} (ID: {cmd_channel_id})")
     
-    # Send start message to commands channel
-    if cmd_channel:
-        try:
-            await cmd_channel.send("🔄 Starting Skyhook backfill (checking last 3 days)...")
-            logger.info(f"[SKYHOOK-BACKFILL] Sent start message to commands channel")
-        except Exception as e:
-            logger.error(f"[SKYHOOK-BACKFILL] Failed to send start message: {e}")
-    
     now = datetime.datetime.now(pytz.UTC)
     three_days_ago = now - datetime.timedelta(days=3)
     logger.info(f"[SKYHOOK-BACKFILL] Checking messages from {three_days_ago} to {now}")
