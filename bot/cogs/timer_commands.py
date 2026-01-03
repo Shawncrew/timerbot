@@ -1270,7 +1270,16 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     cmd_channel = bot.get_channel(cmd_channel_id)
     if not channel:
         logger.warning(f"Could not find skyhooks channel for backfill.")
+        if cmd_channel:
+            await cmd_channel.send("❌ Skyhook backfill failed: Could not find skyhooks channel.")
         return
+    if not cmd_channel:
+        logger.warning(f"Could not find commands channel for backfill notifications.")
+    
+    # Send start message to commands channel
+    if cmd_channel:
+        await cmd_channel.send("🔄 Starting Skyhook backfill (checking last 3 days)...")
+    
     now = datetime.datetime.now(pytz.UTC)
     three_days_ago = now - datetime.timedelta(days=3)
     added = 0
@@ -1355,12 +1364,18 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
     # Send summary
     if cmd_channel:
-        summary = (
-            f"Skyhook Backfill complete: {added} timers added, {already} already present, {failed} failed."
-        )
-        if added > 0:
-            summary += "\nAdded timers:\n" + "\n".join(details)
-        await cmd_channel.send(summary)
+        try:
+            summary = (
+                f"Skyhook Backfill complete: {added} timers added, {already} already present, {failed} failed."
+            )
+            if added > 0:
+                summary += "\nAdded timers:\n" + "\n".join(details)
+            await cmd_channel.send(summary)
+            logger.info(f"Sent skyhook backfill summary to commands channel")
+        except Exception as e:
+            logger.error(f"Error sending skyhook backfill summary: {e}")
+    else:
+        logger.warning("No commands channel found, skipping summary message")
     logger.info(f"Skyhook Backfill summary: {added} added, {already} already present, {failed} failed.")
 
 async def update_existing_ihub_timers_with_alert(timerboard):
