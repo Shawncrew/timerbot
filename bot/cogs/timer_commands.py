@@ -898,9 +898,14 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     if "Skyhook lost shield" in content:
                         logger.info(f"[SKYHOOK] Found 'Skyhook lost shield' in message")
                         # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
-                        # Pattern: "The Orbital Skyhook at <system> <planet> in <system>"
-                        # Also handle variations like "at 1-EVAX III" or "at 1-EVAX Planet III"
-                        skyhook_match = re.search(r'The Orbital Skyhook at\s+([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)\s+in\s+([A-Z0-9-]+)', content, re.IGNORECASE)
+                        # Pattern handles both markdown and plain text:
+                        # "The Orbital Skyhook at **QRH-BF V** in [QRH-BF]" or
+                        # "The Orbital Skyhook at QRH-BF V in QRH-BF"
+                        skyhook_match = re.search(
+                            r'The Orbital Skyhook at\s+(?:\*\*)?([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)(?:\*\*)?\s+in\s+(?:\[|\*\*)?([A-Z0-9-]+)(?:\]|\*\*)?', 
+                            content, 
+                            re.IGNORECASE
+                        )
                         if skyhook_match:
                             system = skyhook_match.group(1).strip()
                             planet = skyhook_match.group(2).strip()
@@ -1370,7 +1375,14 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             if "Skyhook lost shield" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Skyhook lost shield' in message")
                 # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
-                skyhook_match = re.search(r'The Orbital Skyhook at\s+([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)\s+in\s+([A-Z0-9-]+)', content, re.IGNORECASE)
+                # Pattern handles both markdown and plain text:
+                # "The Orbital Skyhook at **QRH-BF V** in [QRH-BF]" or
+                # "The Orbital Skyhook at QRH-BF V in QRH-BF"
+                skyhook_match = re.search(
+                    r'The Orbital Skyhook at\s+(?:\*\*)?([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)(?:\*\*)?\s+in\s+(?:\[|\*\*)?([A-Z0-9-]+)(?:\]|\*\*)?', 
+                    content, 
+                    re.IGNORECASE
+                )
                 if skyhook_match:
                     system = skyhook_match.group(1).strip()
                     planet = skyhook_match.group(2).strip()
