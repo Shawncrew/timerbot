@@ -1353,80 +1353,80 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             if message_count % 50 == 0:
                 logger.info(f"[SKYHOOK-BACKFILL] Processed {message_count} messages so far...")
             content = message.content
-        # If content is empty or doesn't contain keywords, try to extract from embed
-        if (not content or "Skyhook lost shield" not in content) and message.embeds:
-            embed = message.embeds[0]
-            embed_text = []
-            if embed.title:
-                embed_text.append(embed.title)
-            if embed.description:
-                embed_text.append(embed.description)
-            for field in getattr(embed, 'fields', []):
-                embed_text.append(f"{field.name} {field.value}")
-            content = "\n".join(embed_text)
-            logger.info(f"[SKYHOOK-BACKFILL] Extracted embed content: {content}")
-        logger.info(f"[SKYHOOK-BACKFILL] Considering message: {content}")
-        # Check for "Skyhook lost shield" indicator
-        if "Skyhook lost shield" in content:
-            logger.info(f"[SKYHOOK-BACKFILL] Found 'Skyhook lost shield' in message")
-            # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
-            skyhook_match = re.search(r'The Orbital Skyhook at\s+([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)\s+in\s+([A-Z0-9-]+)', content, re.IGNORECASE)
-            if skyhook_match:
-                system = skyhook_match.group(1).strip()
-                planet = skyhook_match.group(2).strip()
-                logger.info(f"[SKYHOOK-BACKFILL] Matched system: {system}, planet: {planet}")
-                # Extract timer time from "reinforcement state until : 2025-11-14 21:52"
-                timer_match = re.search(r'reinforcement state until\s*:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
-                if timer_match:
-                    timer_time_str = timer_match.group(1)
-                    logger.info(f"[SKYHOOK-BACKFILL] Matched timer time: {timer_time_str}")
-                    try:
-                        timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
-                        timer_time = EVE_TZ.localize(timer_time)
-                    except Exception as e:
-                        logger.warning(f"[SKYHOOK-BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
-                        failed += 1
-                        continue
-                    # Skip expired timers
-                    now_utc = datetime.datetime.now(EVE_TZ)
-                    if timer_time < now_utc:
-                        logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {system} - Orbital Skyhook Planet {planet} at {timer_time}")
-                        continue
-                    # Build description with [NC][Skyhook][Final] tags
-                    tags = "[NC][Skyhook][Final]"
-                    structure_name = f"Orbital Skyhook Planet {planet}"
-                    description = f"{system} - {structure_name} {tags}"
-                    # Check for duplicate
-                    duplicate = False
-                    for t in timerboard.timers:
-                        if (
-                            t.system.upper() == system.upper()
-                            and t.structure_name.upper() == structure_name.upper()
-                            and abs((t.time - timer_time).total_seconds()) < 60
-                        ):
-                            duplicate = True
-                            break
-                    if duplicate:
-                        logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}")
-                        already += 1
-                        continue
-                    # Add timer
-                    try:
-                        new_timer, _ = await timerboard.add_timer(timer_time, description)
-                        logger.info(f"[SKYHOOK-BACKFILL] Added timer: {description} at {timer_time}")
-                        added += 1
-                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
-                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
-                    except Exception as e:
-                        logger.warning(f"[SKYHOOK-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
-                        failed += 1
-                        continue
+            # If content is empty or doesn't contain keywords, try to extract from embed
+            if (not content or "Skyhook lost shield" not in content) and message.embeds:
+                embed = message.embeds[0]
+                embed_text = []
+                if embed.title:
+                    embed_text.append(embed.title)
+                if embed.description:
+                    embed_text.append(embed.description)
+                for field in getattr(embed, 'fields', []):
+                    embed_text.append(f"{field.name} {field.value}")
+                content = "\n".join(embed_text)
+                logger.info(f"[SKYHOOK-BACKFILL] Extracted embed content: {content}")
+            logger.info(f"[SKYHOOK-BACKFILL] Considering message: {content}")
+            # Check for "Skyhook lost shield" indicator
+            if "Skyhook lost shield" in content:
+                logger.info(f"[SKYHOOK-BACKFILL] Found 'Skyhook lost shield' in message")
+                # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
+                skyhook_match = re.search(r'The Orbital Skyhook at\s+([A-Z0-9-]+)\s+(?:Planet\s+)?([IVX]+)\s+in\s+([A-Z0-9-]+)', content, re.IGNORECASE)
+                if skyhook_match:
+                    system = skyhook_match.group(1).strip()
+                    planet = skyhook_match.group(2).strip()
+                    logger.info(f"[SKYHOOK-BACKFILL] Matched system: {system}, planet: {planet}")
+                    # Extract timer time from "reinforcement state until : 2025-11-14 21:52"
+                    timer_match = re.search(r'reinforcement state until\s*:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                    if timer_match:
+                        timer_time_str = timer_match.group(1)
+                        logger.info(f"[SKYHOOK-BACKFILL] Matched timer time: {timer_time_str}")
+                        try:
+                            timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                            timer_time = EVE_TZ.localize(timer_time)
+                        except Exception as e:
+                            logger.warning(f"[SKYHOOK-BACKFILL] Could not parse timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                            failed += 1
+                            continue
+                        # Skip expired timers
+                        now_utc = datetime.datetime.now(EVE_TZ)
+                        if timer_time < now_utc:
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {system} - Orbital Skyhook Planet {planet} at {timer_time}")
+                            continue
+                        # Build description with [NC][Skyhook][Final] tags
+                        tags = "[NC][Skyhook][Final]"
+                        structure_name = f"Orbital Skyhook Planet {planet}"
+                        description = f"{system} - {structure_name} {tags}"
+                        # Check for duplicate
+                        duplicate = False
+                        for t in timerboard.timers:
+                            if (
+                                t.system.upper() == system.upper()
+                                and t.structure_name.upper() == structure_name.upper()
+                                and abs((t.time - timer_time).total_seconds()) < 60
+                            ):
+                                duplicate = True
+                                break
+                        if duplicate:
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}")
+                            already += 1
+                            continue
+                        # Add timer
+                        try:
+                            new_timer, _ = await timerboard.add_timer(timer_time, description)
+                            logger.info(f"[SKYHOOK-BACKFILL] Added timer: {description} at {timer_time}")
+                            added += 1
+                            add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                            details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                        except Exception as e:
+                            logger.warning(f"[SKYHOOK-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
+                            failed += 1
+                            continue
+                    else:
+                        logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in message: {content}")
                 else:
-                    logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in message: {content}")
+                    logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from message: {content}")
             else:
-                logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from message: {content}")
-        else:
-            logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
+                logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
     except Exception as e:
         logger.error(f"[SKYHOOK-BACKFILL] ❌ Error iterating through messages: {e}")
         logger.exception("Full traceback:")
