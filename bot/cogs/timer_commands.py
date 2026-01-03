@@ -911,7 +911,10 @@ Use `!timerhelp <command>` for detailed information about any command."""
                             planet = skyhook_match.group(2).strip()
                             logger.info(f"[SKYHOOK] Matched system: {system}, planet: {planet}")
                             # Extract timer time from "reinforcement state until : 2025-11-14 21:52"
-                            timer_match = re.search(r'reinforcement state until\s*:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                            # Pattern handles both markdown and plain text:
+                            # "reinforcement state until : **2026-01-04 23:55**" or
+                            # "reinforcement state until : 2026-01-04 23:55"
+                            timer_match = re.search(r'reinforcement state until\s*:\s*\*?\*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*?\*?', content, re.IGNORECASE)
                             if timer_match:
                                 timer_time_str = timer_match.group(1)
                                 try:
@@ -1388,7 +1391,10 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                     planet = skyhook_match.group(2).strip()
                     logger.info(f"[SKYHOOK-BACKFILL] Matched system: {system}, planet: {planet}")
                     # Extract timer time from "reinforcement state until : 2025-11-14 21:52"
-                    timer_match = re.search(r'reinforcement state until\s*:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                    # Pattern handles both markdown and plain text:
+                    # "reinforcement state until : **2026-01-04 23:55**" or
+                    # "reinforcement state until : 2026-01-04 23:55"
+                    timer_match = re.search(r'reinforcement state until\s*:\s*\*?\*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*?\*?', content, re.IGNORECASE)
                     if timer_match:
                         timer_time_str = timer_match.group(1)
                         logger.info(f"[SKYHOOK-BACKFILL] Matched timer time: {timer_time_str}")
