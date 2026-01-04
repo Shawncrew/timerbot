@@ -1339,8 +1339,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
         logger.info(f"[SKYHOOK-BACKFILL] ✅ Found commands channel: #{cmd_channel.name} (ID: {cmd_channel_id})")
     
     now = datetime.datetime.now(pytz.UTC)
-    three_days_ago = now - datetime.timedelta(days=3)
-    logger.info(f"[SKYHOOK-BACKFILL] Checking messages from {three_days_ago} to {now}")
+    seven_days_ago = now - datetime.timedelta(days=7)
+    logger.info(f"[SKYHOOK-BACKFILL] Checking messages from {seven_days_ago} to {now}")
     added = 0
     already = 0
     failed = 0
@@ -1350,7 +1350,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     timers_to_add = []
     logger.info(f"[SKYHOOK-BACKFILL] Starting to iterate through channel history...")
     try:
-        async for message in channel.history(limit=1000, after=three_days_ago):
+        async for message in channel.history(limit=1000, after=seven_days_ago):
             message_count += 1
             if message_count % 50 == 0:
                 logger.info(f"[SKYHOOK-BACKFILL] Processed {message_count} messages so far...")
