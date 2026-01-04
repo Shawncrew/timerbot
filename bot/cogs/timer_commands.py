@@ -932,7 +932,7 @@ Use `!timerhelp <command>` for detailed information about any command."""
                                 # Notify command channel
                                 cmd_channel = self.bot.get_channel(server_config['commands'])
                                 if cmd_channel:
-                                    add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                                    add_cmd = f"!add {tags} {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name}"
                                     await cmd_channel.send(
                                         f"✅ Auto-added Skyhook timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})\nAdd command: {add_cmd}"
                                     )
