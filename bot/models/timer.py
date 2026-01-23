@@ -66,19 +66,19 @@ class Timer:
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
         # Use markdown link format - system name as clickable link
-        # Testing: Try putting link on new line or with different spacing to help Discord mobile
-        # Format: `timestamp` [system](url) (region) - structure notes (id)
-        # Note: Discord mobile may have issues parsing markdown links, especially in edited messages
+        # Discord mobile may need the link separated from parentheses with extra spacing
+        # Format: `timestamp` [system](url)  (region) - structure notes (id)
+        # Double space after link before parentheses to help mobile parsing
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         is_expired = self.time < now
 
         # If this is an IHUB timer and the description contains the shield emoji, use the description directly
         if '[IHUB]' in self.description and '🛡️' in self.description:
-            # Try single space - maybe double space was causing issues
-            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.description} ({self.timer_id})"
+            # Extra space after link to separate from parentheses for mobile Discord
+            base_str = f"`{time_str}` {system_link}  ({self.region}) - {self.description} ({self.timer_id})"
         else:
-            # Standard format - try single space instead of double
-            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}"
+            # Standard format with double space after link before parentheses
+            base_str = f"`{time_str}` {system_link}  ({self.region}) - {self.structure_name}"
             if self.notes:
                 base_str += f" {self.notes}"
             base_str += f" ({self.timer_id})"
@@ -385,10 +385,7 @@ class TimerBoard:
             try:
                 # Create the timerboard message
                 now = datetime.datetime.now(EVE_TZ)
-                # Format header - Discord mobile has issues with markdown links in first message
-                # Since second message works fine, try removing header or using plain text
-                # Remove header entirely to fix mobile markdown link parsing
-                header = ""
+                header = f"Current Time: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 
                 # Sort timers by time
                 sorted_timers = sorted(self.timers, key=lambda x: x.time)
@@ -413,8 +410,6 @@ class TimerBoard:
                 
                 # Split into multiple messages if needed
                 messages = []
-                # Start first message with header
-                # Discord mobile may need the header separated from markdown links with proper spacing
                 current_message = header
                 
                 for timer_str in timer_list:
@@ -425,7 +420,6 @@ class TimerBoard:
                         current_message = timer_str + "\n"
                     else:
                         # Add to current message
-                        # Ensure proper newline separation for mobile Discord markdown parsing
                         current_message += timer_str + "\n"
                 
                 # Add the last message if it has content
