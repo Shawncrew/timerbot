@@ -65,15 +65,17 @@ class Timer:
         now = datetime.datetime.now(EVE_TZ)
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
+        # Use masked markdown link - ensure proper spacing for mobile Discord compatibility
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         is_expired = self.time < now
 
         # If this is an IHUB timer and the description contains the shield emoji, use the description directly
+        # Add extra space after backticks for better mobile Discord markdown parsing
         if '[IHUB]' in self.description and '🛡️' in self.description:
-            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.description} ({self.timer_id})"
+            base_str = f"`{time_str}`  {system_link} ({self.region}) - {self.description} ({self.timer_id})"
         else:
-            # Format the base string as before
-            base_str = f"`{time_str}` {system_link} ({self.region}) - {self.structure_name}"
+            # Format the base string - extra space helps mobile Discord parse the link correctly
+            base_str = f"`{time_str}`  {system_link} ({self.region}) - {self.structure_name}"
             if self.notes:
                 base_str += f" {self.notes}"
             base_str += f" ({self.timer_id})"
