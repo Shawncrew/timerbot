@@ -61,27 +61,33 @@ class Timer:
                 self.region = ""
 
     def to_string(self) -> str:
-        """Convert timer to string format for display"""
+        """Convert timer to string format for display
+        Format: <timer><systemName>(region)<StructureName> <tags>
+        Where systemName is a clickable hyperlink to evemaps.dotlan
+        """
         now = datetime.datetime.now(EVE_TZ)
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
-        # Use markdown link format - system name as clickable link
-        # Discord mobile may need the link separated from parentheses with extra spacing
-        # Format: `timestamp` [system](url)  (region) - structure notes (id)
-        # Double space after link before parentheses to help mobile parsing
+        # System name as clickable markdown link
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         is_expired = self.time < now
 
+        # Format: timestamp systemLink (region) structureName tags
         # If this is an IHUB timer and the description contains the shield emoji, use the description directly
         if '[IHUB]' in self.description and '🛡️' in self.description:
-            # Extra space after link to separate from parentheses for mobile Discord
-            base_str = f"`{time_str}` {system_link}  ({self.region}) - {self.description} ({self.timer_id})"
+            # For IHUB, extract structure name from description (it includes the emoji)
+            # Description format: "System - Infrastructure Hub [NC][IHUB] 🛡️"
+            # We want: timestamp systemLink (region) Infrastructure Hub [NC][IHUB] 🛡️
+            structure_part = self.description.split(' - ', 1)[1] if ' - ' in self.description else self.description
+            region_part = f"({self.region})" if self.region else ""
+            base_str = f"`{time_str}` {system_link} {region_part} {structure_part}".strip()
         else:
-            # Standard format with double space after link before parentheses
-            base_str = f"`{time_str}` {system_link}  ({self.region}) - {self.structure_name}"
+            # Standard format: timestamp systemLink (region) structureName tags
+            region_part = f"({self.region})" if self.region else ""
+            base_str = f"`{time_str}` {system_link} {region_part} {self.structure_name}".strip()
             if self.notes:
                 base_str += f" {self.notes}"
-            base_str += f" ({self.timer_id})"
+        
         if is_expired:
             base_str = f"~~{base_str}~~"
         return base_str
