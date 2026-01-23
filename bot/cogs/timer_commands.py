@@ -368,8 +368,7 @@ The timer ID is shown in parentheses at the end of each timer entry in the timer
         if timer:
             logger.info(f"{ctx.author} removed timer {timer_id}")
             clean_system = clean_system_name(timer.system)
-            # Use <> to prevent preview in removal message
-            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+            system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
             await ctx.send(f"Removed timer: {system_link} - {timer.structure_name} {timer.notes} at `{timer.time.strftime('%Y-%m-%d %H:%M:%S')}` (ID: {timer.timer_id})")
             
             # Update all timerboards
@@ -994,7 +993,7 @@ Use `!timerhelp <command>` for detailed information about any command."""
                         )
                     else:
                         clean_system = clean_system_name(system)
-                        system_link = f"[{system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                        system_link = f"[{system}](https://evemaps.dotlan.net/system/{clean_system})"
                         await cmd_channel.send(f"✅ Auto-added timer from armor loss: {system_link} - {structure_name} at {time.strftime('%Y-%m-%d %H:%M:%S')} (ID: {new_timer.timer_id})")
                     
             # Update all timerboards
@@ -1049,7 +1048,7 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     cmd_channel = self.bot.get_channel(CONFIG['channels']['commands'])
                     if cmd_channel:
                         clean_system = clean_system_name(system)
-                        system_link = f"[{system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                        system_link = f"[{system}](https://evemaps.dotlan.net/system/{clean_system})"
                         await cmd_channel.send(
                             f"✅ Removed timer for repaired NC Ansiblex: {system_link} - {structure_name} (ID: {timer.timer_id})"
                         )

@@ -65,7 +65,7 @@ class Timer:
         now = datetime.datetime.now(EVE_TZ)
         time_str = self.time.strftime('%Y-%m-%d %H:%M:%S')
         clean_system = clean_system_name(self.system)
-        system_link = f"[{self.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+        system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         is_expired = self.time < now
 
         # If this is an IHUB timer and the description contains the shield emoji, use the description directly

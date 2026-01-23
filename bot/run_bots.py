@@ -299,7 +299,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                         if timer.timer_id not in sixty_min_alerted:
                             logger.info(f"  Sending 60-minute alert for timer {timer.timer_id}")
                             clean_system = clean_system_name(timer.system)
-                            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                            system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                             await cmd_channel.send(
                                 f"⚠️ Timer in 60 minutes:\n"
                                 f"{system_link} ({timer.region}) - {timer.structure_name} {timer.notes}\n"
@@ -316,7 +316,7 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
                         if timer.timer_id not in start_time_alerted:
                             logger.info(f"  Sending start alert for timer {timer.timer_id}")
                             clean_system = clean_system_name(timer.system)
-                            system_link = f"[{timer.system}](<https://evemaps.dotlan.net/system/{clean_system}>)"
+                            system_link = f"[{timer.system}](https://evemaps.dotlan.net/system/{clean_system})"
                             await cmd_channel.send(
                                 f"🚨 **TIMER STARTING NOW**:\n"
                                 f"{system_link} ({timer.region}) - {timer.structure_name} {timer.notes}\n"
