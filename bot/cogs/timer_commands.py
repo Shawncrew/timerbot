@@ -229,46 +229,62 @@ Examples:
             
             # Look for the new format first (structure name on first line, distance on second, reinforced/anchoring on third)
             lines = input_text.split('\n')
-            if len(lines) >= 3 and ('Reinforced until' in lines[2] or 'Anchoring until' in lines[2]):
+            # Check if "Reinforced until" or "Anchoring until" is on line 2 (index 1) or line 3 (index 2)
+            reinforced_line_idx = None
+            for i, line in enumerate(lines):
+                if 'Reinforced until' in line or 'Anchoring until' in line:
+                    reinforced_line_idx = i
+                    break
+            
+            if reinforced_line_idx is not None and len(lines) >= reinforced_line_idx + 1:
                 # Keep the exact structure name from first line
                 structure_name = lines[0].strip()
                 logger.debug(f"Parsed structure name: {structure_name}")
                 
-                # Extract system from structure name - handle special formats
-                system_match = re.match(r'(?:.*?\(([A-Z0-9-]+)[^\)]*\))|([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
-                if system_match:
-                    # Get system from either the parentheses group or the direct match
-                    system = (system_match.group(1) or system_match.group(2)).strip()
-                    
-                    # Check if this is an Ansiblex (has » character or [Ansiblex] tag)
-                    is_ansiblex = '»' in structure_name or '[Ansiblex]' in lines[2]
-                    # Check if this is a Skyhook (has "Orbital Skyhook" in name)
-                    is_skyhook = 'Orbital Skyhook' in structure_name
-                    
-                    if is_ansiblex:
-                        # For Ansiblex, keep the full structure name including the system
-                        structure_name = structure_name.strip()
-                    elif is_skyhook:
-                        # For Skyhook, format as "Orbital Skyhook Planet X"
-                        planet_match = re.search(r'\(.*?\s+([IVX]+)\)', structure_name)
-                        if planet_match:
-                            planet_num = planet_match.group(1)
-                            structure_name = f"Orbital Skyhook Planet {planet_num}"
-                        else:
-                            structure_name = "Orbital Skyhook"
-                    else:
-                        # For other structures, remove the system name and dash
-                        structure_name = structure_name[len(system):].strip()
-                        if structure_name.startswith('-'):
-                            structure_name = structure_name[1:].strip()
-                            
-                    logger.debug(f"Parsed system: {system}, structure: {structure_name}, is_ansiblex: {is_ansiblex}, is_skyhook: {is_skyhook}")
+                # Check if this is a Customs Office format: "Customs Office (DT-TCD IX) [alliance]"
+                customs_office_match = re.match(r'^Customs Office\s+\(([A-Z0-9-]+)\s+([IVX]+)\)', structure_name)
+                if customs_office_match:
+                    system = customs_office_match.group(1).strip()
+                    planet_num = customs_office_match.group(2).strip()
+                    # Construct structure name as "Customs Office Planet IX"
+                    structure_name = f"Customs Office Planet {planet_num}"
+                    logger.debug(f"Parsed Customs Office - system: {system}, structure: {structure_name}")
                 else:
-                    await ctx.send("Could not parse system name from structure")
-                    return
+                    # Extract system from structure name - handle special formats
+                    system_match = re.match(r'(?:.*?\(([A-Z0-9-]+)[^\)]*\))|([A-Z0-9-]+)(?:\s*[»>]\s*.*)?', structure_name)
+                    if system_match:
+                        # Get system from either the parentheses group or the direct match
+                        system = (system_match.group(1) or system_match.group(2)).strip()
+                        
+                        # Check if this is an Ansiblex (has » character or [Ansiblex] tag)
+                        is_ansiblex = '»' in structure_name or '[Ansiblex]' in lines[reinforced_line_idx]
+                        # Check if this is a Skyhook (has "Orbital Skyhook" in name)
+                        is_skyhook = 'Orbital Skyhook' in structure_name
+                        
+                        if is_ansiblex:
+                            # For Ansiblex, keep the full structure name including the system
+                            structure_name = structure_name.strip()
+                        elif is_skyhook:
+                            # For Skyhook, format as "Orbital Skyhook Planet X"
+                            planet_match = re.search(r'\(.*?\s+([IVX]+)\)', structure_name)
+                            if planet_match:
+                                planet_num = planet_match.group(1)
+                                structure_name = f"Orbital Skyhook Planet {planet_num}"
+                            else:
+                                structure_name = "Orbital Skyhook"
+                        else:
+                            # For other structures, remove the system name and dash
+                            structure_name = structure_name[len(system):].strip()
+                            if structure_name.startswith('-'):
+                                structure_name = structure_name[1:].strip()
+                                
+                        logger.debug(f"Parsed system: {system}, structure: {structure_name}, is_ansiblex: {is_ansiblex}, is_skyhook: {is_skyhook}")
+                    else:
+                        await ctx.send("Could not parse system name from structure")
+                        return
                     
                 # Extract time and tags from the "Reinforced until" or "Anchoring until" line
-                time_match = re.search(r'(?:Reinforced|Anchoring) until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[2])
+                time_match = re.search(r'(?:Reinforced|Anchoring) until (\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2})\s*(\[.*\](?:\[.*\])*)?$', lines[reinforced_line_idx])
                 if time_match:
                     time_str = time_match.group(1).replace('.', '-')
                     reinforced_tags = time_match.group(2) if time_match.group(2) else ""
