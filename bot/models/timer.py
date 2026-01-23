@@ -385,9 +385,10 @@ class TimerBoard:
             try:
                 # Create the timerboard message
                 now = datetime.datetime.now(EVE_TZ)
-                # Format header - Discord mobile may have issues parsing markdown links after the header
-                # Put header in code block to isolate it from markdown links and help mobile parsing
-                header = f"`Current Time: {now.strftime('%Y-%m-%d %H:%M:%S')}`\n\n"
+                # Format header - Discord mobile has issues with markdown links in first message
+                # Since second message works fine, try removing header or using plain text
+                # Remove header entirely to fix mobile markdown link parsing
+                header = ""
                 
                 # Sort timers by time
                 sorted_timers = sorted(self.timers, key=lambda x: x.time)
