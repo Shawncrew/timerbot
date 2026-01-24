@@ -342,7 +342,7 @@ Examples:
             
             new_timer, similar_timers = await self.timerboard.add_timer(time, description)
             
-            # Send confirmation
+            # Send confirmation immediately (non-blocking)
             if similar_timers:
                 similar_list = "\n".join([t.to_string() for t in similar_timers])
                 await ctx.send(
@@ -352,13 +352,8 @@ Examples:
             else:
                 await ctx.send(f"✅ Timer added with ID {new_timer.timer_id}")
 
-            # Update all timerboards
-            timerboard_channels = [
-                self.bot.get_channel(server_config['timerboard'])
-                for server_config in CONFIG['servers'].values()
-                if server_config['timerboard'] is not None
-            ]
-            await self.timerboard.update_timerboard(timerboard_channels)
+            # Timerboard update is already scheduled in add_timer() as a background task
+            # No need to update again here - it would be redundant and slow
             
         except Exception as e:
             logger.error(f"Error adding timer: {e}")

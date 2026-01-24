@@ -263,22 +263,19 @@ class TimerBoard:
                 # Extract notes (everything after the structure name in square brackets)
                 notes_match = re.search(r'(\[.*\](?:\[.*\])*$)', description)
                 notes = notes_match.group(1) if notes_match else ""
-                
-                # Get region info
-                region = get_region(system)
-                logger.info(f"Adding timer in {system} ({region})")
-                logger.info(f"Structure: {structure_name}")
-                logger.info(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
-                if notes:
-                    logger.info(f"Tags: {notes}")
             else:
                 system = ""
                 structure_name = description
                 notes = ""
                 logger.warning(f"Could not parse system from description: {description}")
 
-            # Look up region for the system
+            # Look up region for the system (single lookup)
             region = get_region(system) if system else ""
+            logger.info(f"Adding timer in {system} ({region})")
+            logger.info(f"Structure: {structure_name}")
+            logger.info(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
+            if notes:
+                logger.info(f"Tags: {notes}")
             
             new_timer = Timer(
                 time=time,
@@ -302,9 +299,12 @@ class TimerBoard:
             self.next_id += 1
             self.sort_timers()
             
-            # Save and update all timerboards
+            # Save data (synchronous but fast)
             self.save_data()
-            await self.update_all_timerboards()
+            
+            # Schedule timerboard update in background (non-blocking)
+            # The periodic update task will also handle it, but this ensures immediate update
+            asyncio.create_task(self.update_all_timerboards())
             
             logger.info(f"Successfully added timer with ID {new_timer.timer_id}")
             return new_timer, similar_timers
