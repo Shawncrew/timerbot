@@ -63,7 +63,7 @@ class Timer:
 
     def to_string(self) -> str:
         """Convert timer to string format for display
-        Format: <timer><systemName>(region)<StructureName> <tags>
+        Format: <timer><systemName>(region)<StructureName> <tags> (timer_id)
         Where systemName is a clickable hyperlink to evemaps.dotlan
         """
         now = datetime.datetime.now(EVE_TZ)
@@ -73,21 +73,24 @@ class Timer:
         system_link = f"[{self.system}](https://evemaps.dotlan.net/system/{clean_system})"
         is_expired = self.time < now
 
-        # Format: timestamp systemLink (region) structureName tags
+        # Format: timestamp systemLink (region) structureName tags (timer_id)
         # If this is an IHUB timer and the description contains the shield emoji, use the description directly
         if '[IHUB]' in self.description and '🛡️' in self.description:
             # For IHUB, extract structure name from description (it includes the emoji)
             # Description format: "System - Infrastructure Hub [NC][IHUB] 🛡️"
-            # We want: timestamp systemLink (region) Infrastructure Hub [NC][IHUB] 🛡️
+            # We want: timestamp systemLink (region) Infrastructure Hub [NC][IHUB] 🛡️ (timer_id)
             structure_part = self.description.split(' - ', 1)[1] if ' - ' in self.description else self.description
             region_part = f"({self.region})" if self.region else ""
             base_str = f"`{time_str}` {system_link} {region_part} {structure_part}".strip()
         else:
-            # Standard format: timestamp systemLink (region) structureName tags
+            # Standard format: timestamp systemLink (region) structureName tags (timer_id)
             region_part = f"({self.region})" if self.region else ""
             base_str = f"`{time_str}` {system_link} {region_part} {self.structure_name}".strip()
             if self.notes:
                 base_str += f" {self.notes}"
+        
+        # Add timer ID at the end
+        base_str += f" ({self.timer_id})"
         
         if is_expired:
             base_str = f"~~{base_str}~~"
