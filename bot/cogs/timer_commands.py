@@ -1211,7 +1211,8 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                     matching_timer = t
                     break
             if duplicate:
-                logger.info(f"[BACKFILL] Skipping duplicate: {description} at {timer_time} (matches existing timer ID: {matching_timer.timer_id})")
+                timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                logger.info(f"[BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                 already += 1
                 continue
             # Add timer
@@ -1330,7 +1331,8 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                                 matching_timer = t
                                 break
                         if duplicate:
-                            logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time} (matches existing timer ID: {matching_timer.timer_id})")
+                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                            logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                             already += 1
                             continue
                 # Add timer
@@ -1496,7 +1498,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                                 matching_timer = t
                                 break
                         if duplicate:
-                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time} (matches existing timer ID: {matching_timer.timer_id})")
+                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                             already += 1
                             continue
                         # Collect timer to add later (don't add immediately)
@@ -1577,7 +1580,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                                 matching_timer = t
                                 break
                         if duplicate:
-                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time} (matches existing timer ID: {matching_timer.timer_id})")
+                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                             already += 1
                             continue
                         # Collect timer to add later (don't add immediately)
@@ -1636,7 +1640,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                 break
         
         if duplicate:
-            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {timer_data['description']} at {timer_data['time']} (matches existing timer ID: {matching_timer.timer_id})")
+            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {timer_data['description']} at {timer_data['time']}{timer_id_str}")
             already += 1
             continue
         

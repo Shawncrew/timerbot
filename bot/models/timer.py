@@ -267,7 +267,9 @@ class TimerBoard:
                 backup_data = json.load(f)
             
             now = datetime.datetime.now(EVE_TZ)
-            expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
+            # Safely get expiry_time from CONFIG, default to 240 (4 hours) if not available
+            expiry_time = CONFIG.get('expiry_time', 240) if CONFIG else 240
+            expiry_threshold = now - datetime.timedelta(minutes=expiry_time)
             
             # Get current timer IDs to avoid duplicates
             current_timer_ids = {t.timer_id for t in self.timers}
@@ -409,7 +411,9 @@ class TimerBoard:
         now = datetime.datetime.now(EVE_TZ)
         # Remove timers that are MORE than 4 hours past expiration
         # Timers within 4 hours of expiration are kept but shown with strikethrough
-        expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
+        # Safely get expiry_time from CONFIG, default to 240 (4 hours) if not available
+        expiry_time = CONFIG.get('expiry_time', 240) if CONFIG else 240
+        expiry_threshold = now - datetime.timedelta(minutes=expiry_time)
         
         logger.info(f"Checking for expired timers at {now}")
         logger.info(f"Expiry threshold (4 hours past timer time): {expiry_threshold}")

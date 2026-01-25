@@ -360,8 +360,13 @@ async def main():
         
         # Create shared timerboard
         logger.info("Initializing shared timerboard...")
-        timerboard = TimerBoard()
-        logger.info("Timerboard initialized successfully")
+        try:
+            timerboard = TimerBoard()
+            logger.info("Timerboard initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing timerboard: {e}")
+            logger.exception("Full traceback:")
+            raise
         
         # Create tasks for each bot
         tasks = []
