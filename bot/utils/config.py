@@ -10,7 +10,7 @@ def load_config():
     default_config = {
         'check_interval': 60,
         'notification_time': 60,
-        'expiry_time': 60,
+        'expiry_time': 240,  # 4 hours (240 minutes) - keep timers for 4 hours past expiration
         'servers': {
             'server1': {
                 'timerboard': None,

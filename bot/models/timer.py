@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import pytz
+import shutil
 from bot.utils.logger import logger
 from bot.utils.helpers import clean_system_name
 from bot.utils.config import CONFIG
@@ -155,7 +156,7 @@ class TimerBoard:
                 logger.warning(f"Could not find timerboard channel for bot {bot.user}")
 
     def save_data(self):
-        """Save timerboard data to JSON file"""
+        """Save timerboard data to JSON file with backup"""
         data = {
             'next_id': self.next_id,
             'timers': [
@@ -175,6 +176,11 @@ class TimerBoard:
         }
         
         try:
+            # Create backup before saving
+            if Path(self.SAVE_FILE).exists():
+                backup_file = Path(self.SAVE_FILE).with_suffix('.json.bak')
+                shutil.copy2(self.SAVE_FILE, backup_file)
+            
             with open(self.SAVE_FILE, 'w') as f:
                 json.dump(data, f, indent=2)
             logger.info(f"Saved timerboard data to {self.SAVE_FILE}")
@@ -232,12 +238,75 @@ class TimerBoard:
                     logger.error(f"Timer data: {timer_data}")
             
             logger.info(f"Successfully loaded {len(self.timers)} timers")
+            
+            # Check backup file for deleted timers that should be restored (within 4-hour window)
+            self._restore_deleted_timers()
+            
         except Exception as e:
             logger.error(f"Error loading timerboard data: {e}")
             logger.info("Starting with empty timerboard")
             self.next_id = self.STARTING_TIMER_ID
             self.timers = []
             self.filtered_regions = set()
+    
+    def _restore_deleted_timers(self):
+        """Restore timers from backup that were deleted but are within 4-hour window"""
+        try:
+            backup_file = Path(self.SAVE_FILE).with_suffix('.json.bak')
+            if not backup_file.exists():
+                # Try local backup
+                backup_file = Path("timerboard_data.json.bak")
+                if not backup_file.exists():
+                    return
+            
+            logger.info(f"Checking backup file {backup_file} for deleted timers to restore...")
+            with open(backup_file, 'r') as f:
+                backup_data = json.load(f)
+            
+            now = datetime.datetime.now(EVE_TZ)
+            expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
+            
+            # Get current timer IDs to avoid duplicates
+            current_timer_ids = {t.timer_id for t in self.timers}
+            
+            restored_count = 0
+            for timer_data in backup_data.get('timers', []):
+                try:
+                    timer_id = timer_data.get('timer_id')
+                    # Skip if timer already exists
+                    if timer_id in current_timer_ids:
+                        continue
+                    
+                    time = datetime.datetime.fromisoformat(timer_data['time'])
+                    # Only restore if timer is within 4-hour window (not yet fully expired)
+                    if time >= expiry_threshold:
+                        timer = Timer(
+                            time=time,
+                            description=timer_data['description'],
+                            timer_id=timer_id,
+                            system=timer_data['system'],
+                            structure_name=timer_data['structure_name'],
+                            notes=timer_data.get('notes', ''),
+                            message_id=timer_data.get('message_id'),
+                            region=timer_data.get('region', get_region(timer_data['system']))
+                        )
+                        self.timers.append(timer)
+                        current_timer_ids.add(timer_id)
+                        restored_count += 1
+                        logger.info(f"Restored deleted timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer_id})")
+                except Exception as e:
+                    logger.error(f"Error restoring timer from backup: {e}")
+                    logger.error(f"Timer data: {timer_data}")
+            
+            if restored_count > 0:
+                self.sort_timers()
+                self.save_data()
+                logger.info(f"Restored {restored_count} deleted timers that are within 4-hour window")
+            else:
+                logger.info("No deleted timers found in backup that are within 4-hour window")
+                
+        except Exception as e:
+            logger.error(f"Error checking backup for deleted timers: {e}")
 
     def update_next_id(self):
         """Update next_id based on highest existing timer ID"""
@@ -330,35 +399,28 @@ class TimerBoard:
         return timer
 
     def remove_expired(self) -> list[Timer]:
-        """Remove timers that are older than the configured expiry time"""
+        """Remove timers that are more than 4 hours past their expiration time
+        Timers are kept for 4 hours after expiration and shown with strikethrough
+        """
         now = datetime.datetime.now(EVE_TZ)
+        # Remove timers that are MORE than 4 hours past expiration
+        # Timers within 4 hours of expiration are kept but shown with strikethrough
         expiry_threshold = now - datetime.timedelta(minutes=CONFIG['expiry_time'])
         
         logger.info(f"Checking for expired timers at {now}")
-        logger.info(f"Expiry threshold: {expiry_threshold}")
+        logger.info(f"Expiry threshold (4 hours past timer time): {expiry_threshold}")
         
-        # Check each timer
-        for timer in self.timers:
-            logger.info(f"Checking timer {timer.timer_id} for expiry:")
-            logger.info(f"  Timer time: {timer.time}")
-            logger.info(f"  System: {timer.system} ({timer.region})")
-            logger.info(f"  Structure: {timer.structure_name}")
-            minutes_past_timer = (now - timer.time).total_seconds() / 60
-            minutes_until_expiry = minutes_past_timer - CONFIG['expiry_time']
-            logger.info(f"  Minutes past timer time: {minutes_past_timer:.1f}")
-            logger.info(f"  Minutes until expiry: {minutes_until_expiry:.1f}")
-            logger.info(f"  Should expire: {minutes_past_timer > CONFIG['expiry_time']}")
-        
-        # Only remove timers that are past the expiry window
-        expired = [t for t in self.timers if (now - t.time).total_seconds() / 60 > CONFIG['expiry_time']]
+        # Only remove timers that are MORE than 4 hours past their timer time
+        expired = [t for t in self.timers if t.time < expiry_threshold]
         
         if expired:
-            # Remove expired timers from the list
-            self.timers = [t for t in self.timers if (now - t.time).total_seconds() / 60 <= CONFIG['expiry_time']]
-            logger.info(f"Removing {len(expired)} expired timers:")
+            # Remove expired timers from the list (only those past 4-hour window)
+            self.timers = [t for t in self.timers if t.time >= expiry_threshold]
+            logger.info(f"Removing {len(expired)} timers that are more than 4 hours past expiration:")
             for timer in expired:
+                minutes_past = (now - timer.time).total_seconds() / 60
                 logger.info(f"  - ID {timer.timer_id}: {timer.system} ({timer.region}) - {timer.structure_name}")
-                logger.info(f"    Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE")
+                logger.info(f"    Time: {timer.time.strftime('%Y-%m-%d %H:%M:%S')} EVE ({minutes_past:.1f} minutes ago)")
                 if timer.notes:
                     logger.info(f"    Tags: {timer.notes}")
             
@@ -368,7 +430,7 @@ class TimerBoard:
             # Schedule an update of all timerboards
             asyncio.create_task(self.update_all_timerboards())
         else:
-            logger.info("No expired timers found")
+            logger.info("No timers found that are more than 4 hours past expiration")
         
         return expired
 
