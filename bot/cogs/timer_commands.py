@@ -935,8 +935,8 @@ Use `!timerhelp <command>` for detailed information about any command."""
                                 except Exception as e:
                                     logger.warning(f"[SKYHOOK] Could not parse Customs Office timer time: {timer_time_str} | Error: {e} | Message: {content}")
                                     return
-                                # Build description with [NC][INIT][POCO][FINAL] tags
-                                tags = "[NC][INIT][POCO][FINAL]"
+                                # Build description with [NC][POCO][FINAL] tags
+                                tags = "[NC][POCO][FINAL]"
                                 structure_name = f"Customs Office Planet {planet}"
                                 description = f"{system} - {structure_name} {tags}"
                                 new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
