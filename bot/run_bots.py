@@ -3,19 +3,43 @@ import sys
 # Add the parent directory to PYTHONPATH
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+print('NC Timerbot: run_bots.py - Starting imports...')
+
 import asyncio
+print('NC Timerbot: asyncio imported')
+
 import discord
+print('NC Timerbot: discord imported')
+
 from discord.ext import commands
+print('NC Timerbot: commands imported')
+
 import datetime
+print('NC Timerbot: datetime imported')
 
 # Use relative imports since we're inside the bot package
+print('NC Timerbot: Starting bot package imports...')
+
 from bot.utils.config import load_config, CONFIG
+print('NC Timerbot: config imported')
+
 from bot.utils.logger import logger
+print('NC Timerbot: logger imported')
+
 from bot.models.timer import TimerBoard, EVE_TZ
+print('NC Timerbot: TimerBoard imported')
+
 from bot.cogs.timer_commands import TimerCommands, backfill_citadel_timers
+print('NC Timerbot: TimerCommands imported')
+
 from bot.cogs.timer_commands import backfill_sov_timers, backfill_skyhook_timers
+print('NC Timerbot: backfill functions imported')
+
 from bot.cogs.timer_commands import update_existing_ihub_timers_with_alert
+print('NC Timerbot: update_existing_ihub_timers_with_alert imported')
+
 from bot.utils.helpers import clean_system_name
+print('NC Timerbot: helpers imported')
 
 print('NC Timerbot: run_bots.py loaded and running!')
 logger.info("""
@@ -419,10 +443,18 @@ async def main():
                 pass
 
 if __name__ == "__main__":
+    print('NC Timerbot: __main__ block entered')
     try:
+        print('NC Timerbot: Calling logger.info("Starting bot application...")')
         logger.info("Starting bot application...")
+        print('NC Timerbot: Calling asyncio.run(main())')
         asyncio.run(main())
+        print('NC Timerbot: asyncio.run(main()) completed')
     except Exception as e:
+        print(f'NC Timerbot: Exception caught in __main__: {e}')
         logger.error(f"Fatal error starting application: {e}")
         logger.exception("Full traceback:")
-        raise 
+        raise
+    print('NC Timerbot: __main__ block completed')
+else:
+    print(f'NC Timerbot: Module imported as {__name__}') 
