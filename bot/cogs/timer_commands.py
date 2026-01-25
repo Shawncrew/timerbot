@@ -935,8 +935,8 @@ Use `!timerhelp <command>` for detailed information about any command."""
                                 except Exception as e:
                                     logger.warning(f"[SKYHOOK] Could not parse Customs Office timer time: {timer_time_str} | Error: {e} | Message: {content}")
                                     return
-                                # Build description with [INIT][POCO][FINAL] tags
-                                tags = "[INIT][POCO][FINAL]"
+                                # Build description with [NC][INIT][POCO][FINAL] tags
+                                tags = "[NC][INIT][POCO][FINAL]"
                                 structure_name = f"Customs Office Planet {planet}"
                                 description = f"{system} - {structure_name} {tags}"
                                 new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
@@ -1479,8 +1479,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                         else:
                             hours_until = (timer_time - now_utc).total_seconds() / 3600
                             logger.info(f"[SKYHOOK-BACKFILL] Timer is in the future: {hours_until:.1f} hours until {timer_time}")
-                        # Build description with [INIT][POCO][FINAL] tags
-                        tags = "[INIT][POCO][FINAL]"
+                        # Build description with [NC][INIT][POCO][FINAL] tags
+                        tags = "[NC][INIT][POCO][FINAL]"
                         structure_name = f"Customs Office Planet {planet}"
                         description = f"{system} - {structure_name} {tags}"
                         # Check for duplicate
