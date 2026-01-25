@@ -194,7 +194,8 @@ class TimerBoard:
         }
         
         try:
-            # Create backup before saving
+            # Create backup before saving (for safety/recovery purposes, but not used for auto-restore)
+            # The backfill function serves as the restoration mechanism by reading from Discord history
             if Path(self.SAVE_FILE).exists():
                 backup_file = Path(self.SAVE_FILE).with_suffix('.json.bak')
                 shutil.copy2(self.SAVE_FILE, backup_file)
@@ -257,8 +258,8 @@ class TimerBoard:
             
             logger.info(f"Successfully loaded {len(self.timers)} timers")
             
-            # Check backup file for deleted timers that should be restored (within 4-hour window)
-            self._restore_deleted_timers()
+            # Note: We no longer restore from backup. The backfill function serves as the restoration mechanism
+            # by reading from Discord message history and re-adding any missing timers.
             
         except Exception as e:
             logger.error(f"Error loading timerboard data: {e}")
@@ -267,66 +268,9 @@ class TimerBoard:
             self.timers = []
             self.filtered_regions = set()
     
-    def _restore_deleted_timers(self):
-        """Restore timers from backup that were deleted but are within 4-hour window"""
-        try:
-            backup_file = Path(self.SAVE_FILE).with_suffix('.json.bak')
-            if not backup_file.exists():
-                # Try local backup
-                backup_file = Path("timerboard_data.json.bak")
-                if not backup_file.exists():
-                    return
-            
-            logger.info(f"Checking backup file {backup_file} for deleted timers to restore...")
-            with open(backup_file, 'r') as f:
-                backup_data = json.load(f)
-            
-            now = datetime.datetime.now(EVE_TZ)
-            # Safely get expiry_time from CONFIG, default to 240 (4 hours) if not available
-            expiry_time = CONFIG.get('expiry_time', 240) if CONFIG else 240
-            expiry_threshold = now - datetime.timedelta(minutes=expiry_time)
-            
-            # Get current timer IDs to avoid duplicates
-            current_timer_ids = {t.timer_id for t in self.timers}
-            
-            restored_count = 0
-            for timer_data in backup_data.get('timers', []):
-                try:
-                    timer_id = timer_data.get('timer_id')
-                    # Skip if timer already exists
-                    if timer_id in current_timer_ids:
-                        continue
-                    
-                    time = datetime.datetime.fromisoformat(timer_data['time'])
-                    # Only restore if timer is within 4-hour window (not yet fully expired)
-                    if time >= expiry_threshold:
-                        timer = Timer(
-                            time=time,
-                            description=timer_data['description'],
-                            timer_id=timer_id,
-                            system=timer_data['system'],
-                            structure_name=timer_data['structure_name'],
-                            notes=timer_data.get('notes', ''),
-                            message_id=timer_data.get('message_id'),
-                            region=timer_data.get('region', get_region(timer_data['system']))
-                        )
-                        self.timers.append(timer)
-                        current_timer_ids.add(timer_id)
-                        restored_count += 1
-                        logger.info(f"Restored deleted timer: {timer.system} - {timer.structure_name} at {time} (ID: {timer_id})")
-                except Exception as e:
-                    logger.error(f"Error restoring timer from backup: {e}")
-                    logger.error(f"Timer data: {timer_data}")
-            
-            if restored_count > 0:
-                self.sort_timers()
-                self.save_data()
-                logger.info(f"Restored {restored_count} deleted timers that are within 4-hour window")
-            else:
-                logger.info("No deleted timers found in backup that are within 4-hour window")
-                
-        except Exception as e:
-            logger.error(f"Error checking backup for deleted timers: {e}")
+    # Note: Backup restore functionality has been removed.
+    # The backfill function now serves as the restoration mechanism by reading from Discord message history.
+    # Backup files are still created for safety/recovery purposes but are not automatically restored.
 
     def update_next_id(self):
         """Update next_id based on highest existing timer ID"""
@@ -416,6 +360,8 @@ class TimerBoard:
             self.save_data()
             # Don't update timerboard here - let the caller handle it
             # This avoids race conditions and duplicate updates
+            # Note: Backup file is kept for safety but not used for restoration.
+            # The backfill function will restore timers from Discord message history.
             
         return timer
 
