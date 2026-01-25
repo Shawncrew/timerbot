@@ -1318,23 +1318,23 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                 alert_emoji = " 🚨" if region and region in ALERT_REGIONS else ""
                 tags = f"[NC][IHUB] 🛡️{alert_emoji}"
                 description = f"{system} - Infrastructure Hub {tags}"
-                        # Check for duplicate
-                        duplicate = False
-                        matching_timer = None
-                        for t in timerboard.timers:
-                            if (
-                                t.system.upper() == system.upper()
-                                and t.structure_name.upper() == "INFRASTRUCTURE HUB"
-                                and abs((t.time - timer_time).total_seconds()) < 60
-                            ):
-                                duplicate = True
-                                matching_timer = t
-                                break
-                        if duplicate:
-                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
-                            logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
-                            already += 1
-                            continue
+                # Check for duplicate
+                duplicate = False
+                matching_timer = None
+                for t in timerboard.timers:
+                    if (
+                        t.system.upper() == system.upper()
+                        and t.structure_name.upper() == "INFRASTRUCTURE HUB"
+                        and abs((t.time - timer_time).total_seconds()) < 60
+                    ):
+                        duplicate = True
+                        matching_timer = t
+                        break
+                if duplicate:
+                    timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                    logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
+                    already += 1
+                    continue
                 # Add timer
                 try:
                     new_timer, _ = await timerboard.add_timer(timer_time, description)
