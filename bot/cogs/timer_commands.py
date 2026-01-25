@@ -908,19 +908,20 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     # Check for "Customs Office" reinforcement
                     if "Customs Office" in content and "has been reinforced" in content:
                         logger.info(f"[SKYHOOK] Found 'Customs Office' reinforcement in message")
-                        # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U (Pure Blind)"
-                        # Pattern handles optional parentheses/region after system name
+                        # Extract system and planet from "The Customs Office at TFA0-U III in [TFA0-U](url) (Pure Blind)"
+                        # Pattern handles markdown links and optional parentheses/region after system name
                         customs_match = re.search(
-                            r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)(?:\s*\([^)]+\))?',
+                            r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+(?:\[([A-Z0-9-]+)\]\([^)]+\)|([A-Z0-9-]+))(?:\s*\([^)]+\))?',
                             content,
                             re.IGNORECASE
                         )
                         if customs_match:
-                            system = customs_match.group(3).strip()  # System is the third group (after "in")
+                            # System can be in group 3 (markdown link) or group 4 (plain text)
+                            system = (customs_match.group(3) or customs_match.group(4)).strip()
                             planet = customs_match.group(2).strip()
                             logger.info(f"[SKYHOOK] Matched Customs Office - system: {system}, planet: {planet}")
-                            # Extract timer time from "will come out at: 2026-01-26 11:50" (may have text after like "(a day from now)")
-                            timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
+                            # Extract timer time from "will come out at: **2026-01-26 11:50**" (may have markdown bold and text after)
+                            timer_match = re.search(r'(?:and\s+)?will come out at:\s*\*?\*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*?\*?(?:\s*\([^)]+\))?', content, re.IGNORECASE)
                             if timer_match:
                                 timer_time_str = timer_match.group(1)
                                 try:
@@ -1430,21 +1431,22 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             if "Customs Office" in content and "has been reinforced" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Customs Office' reinforcement in message")
                 logger.info(f"[SKYHOOK-BACKFILL] Full message content: {content}")
-                # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U (Pure Blind)"
-                # Pattern handles optional parentheses/region after system name
-                # Also handle case where system name might have different formatting
+                # Extract system and planet from "The Customs Office at TFA0-U III in [TFA0-U](url) (Pure Blind)"
+                # Pattern handles markdown links and optional parentheses/region after system name
+                # Format can be: "in TFA0-U" or "in [TFA0-U](url)" or "in [TFA0-U](url) (Pure Blind)"
                 customs_match = re.search(
-                    r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)(?:\s*\([^)]+\))?',
+                    r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+(?:\[([A-Z0-9-]+)\]\([^)]+\)|([A-Z0-9-]+))(?:\s*\([^)]+\))?',
                     content,
                     re.IGNORECASE
                 )
                 if customs_match:
-                    system = customs_match.group(3).strip()  # System is the third group (after "in")
+                    # System can be in group 3 (markdown link) or group 4 (plain text)
+                    system = (customs_match.group(3) or customs_match.group(4)).strip()
                     planet = customs_match.group(2).strip()
                     logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office - system: {system}, planet: {planet}")
-                    # Extract timer time from "will come out at: 2026-01-26 11:50" (may have text after like "(a day from now)")
+                    # Extract timer time from "will come out at: **2026-01-26 11:50**" (may have markdown bold and text after)
                     # Also handle "and will come out at:" format
-                    timer_match = re.search(r'(?:and\s+)?will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
+                    timer_match = re.search(r'(?:and\s+)?will come out at:\s*\*?\*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\*?\*?(?:\s*\([^)]+\))?', content, re.IGNORECASE)
                     if timer_match:
                         timer_time_str = timer_match.group(1)
                         logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office timer time: {timer_time_str}")
