@@ -891,7 +891,7 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     logger.info(f"[SKYHOOK] Received message in skyhooks channel: {message.id} | Author: {message.author} | Content: {message.content} | Embeds: {len(message.embeds)}")
                     content = message.content
                     # If content is empty or doesn't contain keywords, try to extract from embed
-                    if (not content or "Skyhook lost shield" not in content) and message.embeds:
+                    if (not content or ("Skyhook lost shield" not in content and "Customs Office" not in content)) and message.embeds:
                         embed = message.embeds[0]
                         embed_text = []
                         if embed.title:
@@ -904,8 +904,49 @@ Use `!timerhelp <command>` for detailed information about any command."""
                         logger.info(f"[SKYHOOK] Extracted embed content: {content}")
                     else:
                         logger.info(f"[SKYHOOK] Using message content for parsing: {content}")
+                    
+                    # Check for "Customs Office" reinforcement
+                    if "Customs Office" in content and "has been reinforced" in content:
+                        logger.info(f"[SKYHOOK] Found 'Customs Office' reinforcement in message")
+                        # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U"
+                        customs_match = re.search(
+                            r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)',
+                            content,
+                            re.IGNORECASE
+                        )
+                        if customs_match:
+                            system = customs_match.group(3).strip()  # System is the third group (after "in")
+                            planet = customs_match.group(2).strip()
+                            logger.info(f"[SKYHOOK] Matched Customs Office - system: {system}, planet: {planet}")
+                            # Extract timer time from "will come out at: 2026-01-26 11:50"
+                            timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                            if timer_match:
+                                timer_time_str = timer_match.group(1)
+                                try:
+                                    timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                                    timer_time = EVE_TZ.localize(timer_time)
+                                except Exception as e:
+                                    logger.warning(f"[SKYHOOK] Could not parse Customs Office timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                                    return
+                                # Build description with [INIT][POCO][FINAL] tags
+                                tags = "[INIT][POCO][FINAL]"
+                                structure_name = f"Customs Office Planet {planet}"
+                                description = f"{system} - {structure_name} {tags}"
+                                new_timer, similar_timers = await self.timerboard.add_timer(timer_time, description)
+                                logger.info(f"[SKYHOOK] Added Customs Office timer: {description} at {timer_time}")
+                                # Notify command channel
+                                cmd_channel = self.bot.get_channel(server_config['commands'])
+                                if cmd_channel:
+                                    await cmd_channel.send(
+                                        f"✅ Auto-added Customs Office timer: {system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags} (ID: {new_timer.timer_id})"
+                                    )
+                                logger.info(f"Auto-added Customs Office timer from skyhooks: {description}")
+                            else:
+                                logger.warning(f"[SKYHOOK] Could not find timer time in Customs Office message: {content}")
+                        else:
+                            logger.warning(f"[SKYHOOK] Could not parse system and planet from Customs Office message: {content}")
                     # Check for "Skyhook lost shield" indicator
-                    if "Skyhook lost shield" in content:
+                    elif "Skyhook lost shield" in content:
                         logger.info(f"[SKYHOOK] Found 'Skyhook lost shield' in message")
                         # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
                         # Pattern handles both markdown and plain text:
@@ -952,7 +993,7 @@ Use `!timerhelp <command>` for detailed information about any command."""
                         else:
                             logger.warning(f"[SKYHOOK] Could not parse system and planet from message: {content}")
                     else:
-                        logger.info(f"[SKYHOOK] No match for 'Skyhook lost shield' pattern in content: {content}")
+                        logger.info(f"[SKYHOOK] No match for 'Skyhook lost shield' or 'Customs Office' pattern in content: {content}")
                     break
         except Exception as e:
             logger.error(f"Error processing citadel-attacked message: {e}")
@@ -1366,7 +1407,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                 logger.info(f"[SKYHOOK-BACKFILL] Processed {message_count} messages so far...")
             content = message.content
             # If content is empty or doesn't contain keywords, try to extract from embed
-            if (not content or "Skyhook lost shield" not in content) and message.embeds:
+            if (not content or ("Skyhook lost shield" not in content and "Customs Office" not in content)) and message.embeds:
                 embed = message.embeds[0]
                 embed_text = []
                 if embed.title:
@@ -1378,8 +1419,72 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                 content = "\n".join(embed_text)
                 logger.info(f"[SKYHOOK-BACKFILL] Extracted embed content: {content}")
             logger.info(f"[SKYHOOK-BACKFILL] Considering message: {content}")
+            
+            # Check for "Customs Office" reinforcement
+            if "Customs Office" in content and "has been reinforced" in content:
+                logger.info(f"[SKYHOOK-BACKFILL] Found 'Customs Office' reinforcement in message")
+                # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U"
+                customs_match = re.search(
+                    r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)',
+                    content,
+                    re.IGNORECASE
+                )
+                if customs_match:
+                    system = customs_match.group(3).strip()  # System is the third group (after "in")
+                    planet = customs_match.group(2).strip()
+                    logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office - system: {system}, planet: {planet}")
+                    # Extract timer time from "will come out at: 2026-01-26 11:50"
+                    timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                    if timer_match:
+                        timer_time_str = timer_match.group(1)
+                        logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office timer time: {timer_time_str}")
+                        try:
+                            timer_time = datetime.datetime.strptime(timer_time_str, "%Y-%m-%d %H:%M")
+                            timer_time = EVE_TZ.localize(timer_time)
+                        except Exception as e:
+                            logger.warning(f"[SKYHOOK-BACKFILL] Could not parse Customs Office timer time: {timer_time_str} | Error: {e} | Message: {content}")
+                            failed += 1
+                            continue
+                        # Skip expired timers
+                        now_utc = datetime.datetime.now(EVE_TZ)
+                        if timer_time < now_utc:
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {system} - Customs Office Planet {planet} at {timer_time}")
+                            continue
+                        # Build description with [INIT][POCO][FINAL] tags
+                        tags = "[INIT][POCO][FINAL]"
+                        structure_name = f"Customs Office Planet {planet}"
+                        description = f"{system} - {structure_name} {tags}"
+                        # Check for duplicate
+                        duplicate = False
+                        for t in timerboard.timers:
+                            if (
+                                t.system.upper() == system.upper()
+                                and t.structure_name.upper() == structure_name.upper()
+                                and abs((t.time - timer_time).total_seconds()) < 60
+                            ):
+                                duplicate = True
+                                break
+                        if duplicate:
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}")
+                            already += 1
+                            continue
+                        # Collect timer to add later (don't add immediately)
+                        timers_to_add.append({
+                            'time': timer_time,
+                            'description': description,
+                            'system': system,
+                            'structure_name': structure_name,
+                            'tags': tags
+                        })
+                        logger.info(f"[SKYHOOK-BACKFILL] Collected Customs Office timer to add: {description} at {timer_time}")
+                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                    else:
+                        logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in Customs Office message: {content}")
+                else:
+                    logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from Customs Office message: {content}")
             # Check for "Skyhook lost shield" indicator
-            if "Skyhook lost shield" in content:
+            elif "Skyhook lost shield" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Skyhook lost shield' in message")
                 # Extract system and planet from "The Orbital Skyhook at 1-EVAX III in 1-EVAX"
                 # Pattern handles both markdown and plain text:
@@ -1448,7 +1553,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                 else:
                     logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from message: {content}")
             else:
-                logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield'. Skipping.")
+                logger.info(f"[SKYHOOK-BACKFILL] Message does not contain 'Skyhook lost shield' or 'Customs Office'. Skipping.")
     except Exception as e:
         logger.error(f"[SKYHOOK-BACKFILL] ❌ Error iterating through messages: {e}")
         logger.exception("Full traceback:")
