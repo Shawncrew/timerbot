@@ -1429,8 +1429,10 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             # Check for "Customs Office" reinforcement
             if "Customs Office" in content and "has been reinforced" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Customs Office' reinforcement in message")
+                logger.info(f"[SKYHOOK-BACKFILL] Full message content: {content}")
                 # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U (Pure Blind)"
                 # Pattern handles optional parentheses/region after system name
+                # Also handle case where system name might have different formatting
                 customs_match = re.search(
                     r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)(?:\s*\([^)]+\))?',
                     content,
@@ -1441,7 +1443,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                     planet = customs_match.group(2).strip()
                     logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office - system: {system}, planet: {planet}")
                     # Extract timer time from "will come out at: 2026-01-26 11:50" (may have text after like "(a day from now)")
-                    timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
+                    # Also handle "and will come out at:" format
+                    timer_match = re.search(r'(?:and\s+)?will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
                     if timer_match:
                         timer_time_str = timer_match.group(1)
                         logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office timer time: {timer_time_str}")
@@ -1455,8 +1458,12 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                         # Skip expired timers
                         now_utc = datetime.datetime.now(EVE_TZ)
                         if timer_time < now_utc:
-                            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {system} - Customs Office Planet {planet} at {timer_time}")
+                            hours_past = (now_utc - timer_time).total_seconds() / 3600
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {system} - Customs Office Planet {planet} at {timer_time} ({hours_past:.1f} hours ago)")
                             continue
+                        else:
+                            hours_until = (timer_time - now_utc).total_seconds() / 3600
+                            logger.info(f"[SKYHOOK-BACKFILL] Timer is in the future: {hours_until:.1f} hours until {timer_time}")
                         # Build description with [INIT][POCO][FINAL] tags
                         tags = "[INIT][POCO][FINAL]"
                         structure_name = f"Customs Office Planet {planet}"
@@ -1487,9 +1494,19 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                         add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
                         details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
                     else:
-                        logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in Customs Office message: {content}")
+                        logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in Customs Office message")
+                        logger.warning(f"[SKYHOOK-BACKFILL] Message content: {content[:500]}")
+                        logger.warning(f"[SKYHOOK-BACKFILL] Searching for pattern: 'will come out at:'")
+                        if "will come out" in content:
+                            logger.warning(f"[SKYHOOK-BACKFILL] Found 'will come out' but pattern didn't match")
                 else:
-                    logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from Customs Office message: {content}")
+                    logger.warning(f"[SKYHOOK-BACKFILL] Could not parse system and planet from Customs Office message")
+                    logger.warning(f"[SKYHOOK-BACKFILL] Message content: {content[:500]}")
+                    logger.warning(f"[SKYHOOK-BACKFILL] Searching for pattern: 'The Customs Office at ... in ...'")
+                    # Try a simpler pattern to see if we can match anything
+                    simple_match = re.search(r'Customs Office.*?at\s+([A-Z0-9-]+)\s+([IVX]+)', content, re.IGNORECASE)
+                    if simple_match:
+                        logger.warning(f"[SKYHOOK-BACKFILL] Simple pattern matched: system={simple_match.group(1)}, planet={simple_match.group(2)}")
             # Check for "Skyhook lost shield" indicator
             elif "Skyhook lost shield" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Skyhook lost shield' in message")
