@@ -386,7 +386,8 @@ class TimerBoard:
             raise
 
     def remove_timer(self, timer_id: int) -> Optional[Timer]:
-        """Remove a timer and update all timerboards"""
+        """Remove a timer from the list and save data.
+        Note: Timerboard update should be handled by the caller."""
         timer = None
         for t in self.timers:
             if t.timer_id == timer_id:
@@ -396,8 +397,8 @@ class TimerBoard:
                 
         if timer:
             self.save_data()
-            # Schedule timerboard update
-            asyncio.create_task(self.update_all_timerboards())
+            # Don't update timerboard here - let the caller handle it
+            # This avoids race conditions and duplicate updates
             
         return timer
 

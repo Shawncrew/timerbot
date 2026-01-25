@@ -388,7 +388,12 @@ The timer ID is shown in parentheses at the end of each timer entry in the timer
                 for server_config in CONFIG['servers'].values()
                 if server_config['timerboard'] is not None
             ]
-            await self.timerboard.update_timerboard(timerboard_channels)
+            # Filter out None channels
+            timerboard_channels = [ch for ch in timerboard_channels if ch is not None]
+            if timerboard_channels:
+                await self.timerboard.update_timerboard(timerboard_channels)
+            else:
+                logger.warning("No timerboard channels found to update after removing timer")
         else:
             logger.warning(f"{ctx.author} attempted to remove non-existent timer {timer_id}")
             await ctx.send(f"No timer found with ID {timer_id}")
