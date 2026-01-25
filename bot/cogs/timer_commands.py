@@ -1235,8 +1235,6 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
             summary = (
                 f"Structure backfill complete: {added} timers added, {already} already present, {failed} failed."
             )
-            if added > 0:
-                summary += "\nAdded timers:\n" + "\n".join(details)
             await cmd_channel.send(summary)
             logger.info(f"[CITADEL-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
         except Exception as e:
@@ -1355,8 +1353,6 @@ async def backfill_sov_timers(bot, timerboard, server_config):
         summary = (
             f"SOV Backfill complete: {added} timers added, {already} already present, {failed} failed."
         )
-        if added > 0:
-            summary += "\nAdded timers:\n" + "\n".join(details)
         await cmd_channel.send(summary)
     logger.info(f"SOV Backfill summary: {added} added, {already} already present, {failed} failed.") 
 
@@ -1689,8 +1685,6 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             summary = (
                 f"Skyhook Backfill complete: {added} timers added, {already} already present, {failed} failed."
             )
-            if added > 0:
-                summary += "\nAdded timers:\n" + "\n".join(details)
             await cmd_channel.send(summary)
             logger.info(f"[SKYHOOK-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
         except Exception as e:
