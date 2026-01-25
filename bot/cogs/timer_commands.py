@@ -1147,14 +1147,6 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
         logger.warning(f"[CITADEL-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id})")
     now = datetime.datetime.now(pytz.UTC)
     five_days_ago = now - datetime.timedelta(days=5)
-    
-    # Build a set for O(1) duplicate checking
-    existing_timers_set = set()
-    for t in timerboard.timers:
-        time_key = t.time.replace(second=0, microsecond=0)
-        key = (t.system.upper(), t.structure_name.upper(), time_key)
-        existing_timers_set.add(key)
-    
     added = 0
     already = 0
     failed = 0
@@ -1206,19 +1198,30 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
             # Build tags
             tags = f"{extract_ticker_from_message(content)}[{structure_tag.upper()}][{timer_type.upper()}]"
             description = f"{system} - {structure_name} {tags}"
-            # Check for duplicate using optimized set lookup (O(1) instead of O(n))
-            time_key = timer_time.replace(second=0, microsecond=0)
-            duplicate_key = (system.upper(), structure_name.upper(), time_key)
-            if duplicate_key in existing_timers_set:
+            # Check for duplicate
+            duplicate = False
+            matching_timer = None
+            for t in timerboard.timers:
+                if (
+                    t.system.upper() == system.upper()
+                    and t.structure_name.upper() == structure_name.upper()
+                    and abs((t.time - timer_time).total_seconds()) < 60
+                ):
+                    duplicate = True
+                    matching_timer = t
+                    break
+            if duplicate:
+                timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                logger.info(f"[BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                 already += 1
                 continue
             # Add timer
             try:
                 new_timer, _ = await timerboard.add_timer(timer_time, description)
-                # Add to existing_timers_set for subsequent duplicate checks
-                time_key = timer_time.replace(second=0, microsecond=0)
-                existing_timers_set.add((system.upper(), structure_name.upper(), time_key))
+                logger.info(f"[BACKFILL] Added timer: {description} at {timer_time}")
                 added += 1
+                add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
             except Exception as e:
                 logger.warning(f"[BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                 failed += 1
@@ -1266,14 +1269,6 @@ async def backfill_sov_timers(bot, timerboard, server_config):
         logger.warning(f"[SOV-BACKFILL] ⚠️  Could not find commands channel (ID: {cmd_channel_id})")
     now = datetime.datetime.now(pytz.UTC)
     five_days_ago = now - datetime.timedelta(days=5)
-    
-    # Build a set for O(1) duplicate checking
-    existing_timers_set = set()
-    for t in timerboard.timers:
-        time_key = t.time.replace(second=0, microsecond=0)
-        key = (t.system.upper(), "INFRASTRUCTURE HUB", time_key)
-        existing_timers_set.add(key)
-    
     added = 0
     already = 0
     failed = 0
@@ -1321,19 +1316,30 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                 alert_emoji = " 🚨" if region and region in ALERT_REGIONS else ""
                 tags = f"[NC][IHUB] 🛡️{alert_emoji}"
                 description = f"{system} - Infrastructure Hub {tags}"
-                # Check for duplicate using optimized set lookup (O(1) instead of O(n))
-                time_key = timer_time.replace(second=0, microsecond=0)
-                duplicate_key = (system.upper(), "INFRASTRUCTURE HUB", time_key)
-                if duplicate_key in existing_timers_set:
+                # Check for duplicate
+                duplicate = False
+                matching_timer = None
+                for t in timerboard.timers:
+                    if (
+                        t.system.upper() == system.upper()
+                        and t.structure_name.upper() == "INFRASTRUCTURE HUB"
+                        and abs((t.time - timer_time).total_seconds()) < 60
+                    ):
+                        duplicate = True
+                        matching_timer = t
+                        break
+                if duplicate:
+                    timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                    logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                     already += 1
                     continue
                 # Add timer
                 try:
                     new_timer, _ = await timerboard.add_timer(timer_time, description)
-                    # Add to existing_timers_set for subsequent duplicate checks
-                    time_key = timer_time.replace(second=0, microsecond=0)
-                    existing_timers_set.add((system.upper(), "INFRASTRUCTURE HUB", time_key))
+                    logger.info(f"[SOV-BACKFILL] Added timer: {description} at {timer_time}")
                     added += 1
+                    add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
+                    details.append(f"{system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
                 except Exception as e:
                     logger.warning(f"[SOV-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                     failed += 1
@@ -1354,15 +1360,9 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     """Backfill timers from the last 3 days of skyhooks channel messages."""
     logger.info(f"[SKYHOOK-BACKFILL] ========== Starting Skyhook Backfill ==========")
     logger.info(f"[SKYHOOK-BACKFILL] Current timers in memory: {len(timerboard.timers)}")
-    
-    # Build a set for O(1) duplicate checking - key is (system_upper, structure_upper, time_rounded_to_minute)
-    # This dramatically speeds up duplicate detection
-    existing_timers_set = set()
-    for t in timerboard.timers:
-        # Round time to nearest minute for comparison (60 second window)
-        time_key = t.time.replace(second=0, microsecond=0)
-        key = (t.system.upper(), t.structure_name.upper(), time_key)
-        existing_timers_set.add(key)
+    if timerboard.timers:
+        timer_ids = [t.timer_id for t in timerboard.timers]
+        logger.info(f"[SKYHOOK-BACKFILL] Current timer IDs: {timer_ids}")
     logger.info(f"[SKYHOOK-BACKFILL] Server config: {server_config}")
     channel_id = server_config.get('skyhooks')
     cmd_channel_id = server_config.get('commands')
@@ -1481,10 +1481,21 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                         tags = "[INIT][POCO][FINAL]"
                         structure_name = f"Customs Office Planet {planet}"
                         description = f"{system} - {structure_name} {tags}"
-                        # Check for duplicate using optimized set lookup (O(1) instead of O(n))
-                        time_key = timer_time.replace(second=0, microsecond=0)
-                        duplicate_key = (system.upper(), structure_name.upper(), time_key)
-                        if duplicate_key in existing_timers_set:
+                        # Check for duplicate
+                        duplicate = False
+                        matching_timer = None
+                        for t in timerboard.timers:
+                            if (
+                                t.system.upper() == system.upper()
+                                and t.structure_name.upper() == structure_name.upper()
+                                and abs((t.time - timer_time).total_seconds()) < 60
+                            ):
+                                duplicate = True
+                                matching_timer = t
+                                break
+                        if duplicate:
+                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                             already += 1
                             continue
                         # Collect timer to add later (don't add immediately)
@@ -1495,7 +1506,9 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                             'structure_name': structure_name,
                             'tags': tags
                         })
-                        # Removed details collection - no longer needed
+                        logger.info(f"[SKYHOOK-BACKFILL] Collected Customs Office timer to add: {description} at {timer_time}")
+                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
                     else:
                         logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in Customs Office message")
                         logger.warning(f"[SKYHOOK-BACKFILL] Message content: {content[:500]}")
@@ -1550,10 +1563,21 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                         tags = "[NC][Skyhook][Final]"
                         structure_name = f"Orbital Skyhook Planet {planet}"
                         description = f"{system} - {structure_name} {tags}"
-                        # Check for duplicate using optimized set lookup (O(1) instead of O(n))
-                        time_key = timer_time.replace(second=0, microsecond=0)
-                        duplicate_key = (system.upper(), structure_name.upper(), time_key)
-                        if duplicate_key in existing_timers_set:
+                        # Check for duplicate
+                        duplicate = False
+                        matching_timer = None
+                        for t in timerboard.timers:
+                            if (
+                                t.system.upper() == system.upper()
+                                and t.structure_name.upper() == structure_name.upper()
+                                and abs((t.time - timer_time).total_seconds()) < 60
+                            ):
+                                duplicate = True
+                                matching_timer = t
+                                break
+                        if duplicate:
+                            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+                            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
                             already += 1
                             continue
                         # Collect timer to add later (don't add immediately)
@@ -1564,6 +1588,9 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                             'structure_name': structure_name,
                             'tags': tags
                         })
+                        logger.info(f"[SKYHOOK-BACKFILL] Collected timer to add: {description} at {timer_time}")
+                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
                     else:
                         logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in message: {content}")
                 else:
@@ -1587,20 +1614,30 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
     from bot.models.timer import Timer
     from bot.utils.eve_data import get_region
     
-    # Cache region lookups to avoid repeated dictionary access
-    region_cache = {}
-    
     logger.info(f"[SKYHOOK-BACKFILL] Verifying {len(timers_to_add)} collected timers are still current...")
     for timer_data in timers_to_add:
         # Double-check timer is still current (not expired)
         if timer_data['time'] < now_utc:
+            logger.info(f"[SKYHOOK-BACKFILL] Skipping expired timer: {timer_data['description']} at {timer_data['time']}")
             failed += 1
             continue
         
-        # Check for duplicates again using optimized set lookup (O(1) instead of O(n))
-        time_key = timer_data['time'].replace(second=0, microsecond=0)
-        duplicate_key = (timer_data['system'].upper(), timer_data['structure_name'].upper(), time_key)
-        if duplicate_key in existing_timers_set:
+        # Check for duplicates again (in case something changed during processing)
+        duplicate = False
+        matching_timer = None
+        for t in timerboard.timers:
+            if (
+                t.system.upper() == timer_data['system'].upper()
+                and t.structure_name.upper() == timer_data['structure_name'].upper()
+                and abs((t.time - timer_data['time']).total_seconds()) < 60
+            ):
+                duplicate = True
+                matching_timer = t
+                break
+        
+        if duplicate:
+            timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
+            logger.info(f"[SKYHOOK-BACKFILL] Skipping duplicate: {timer_data['description']} at {timer_data['time']}{timer_id_str}")
             already += 1
             continue
         
