@@ -112,13 +112,28 @@ class TimerBoard:
     UPDATE_INTERVAL = 60  # Update interval in seconds
     
     def __init__(self):
-        self.timers = []
-        self.next_id = self.STARTING_TIMER_ID
-        self.bots = []  # List to store bot instances
-        self.last_update = None
-        self.update_task = None
-        self.filtered_regions = set()  # Set of region names to filter out
-        self.load_data()
+        try:
+            logger.info("TimerBoard.__init__() called")
+            self.timers = []
+            self.next_id = self.STARTING_TIMER_ID
+            self.bots = []  # List to store bot instances
+            self.last_update = None
+            self.update_task = None
+            self.filtered_regions = set()  # Set of region names to filter out
+            logger.info("TimerBoard basic attributes initialized, calling load_data()...")
+            self.load_data()
+            logger.info("TimerBoard.__init__() completed successfully")
+        except Exception as e:
+            logger.error(f"Error in TimerBoard.__init__(): {e}")
+            logger.exception("Full traceback:")
+            # Set defaults on error
+            self.timers = []
+            self.next_id = self.STARTING_TIMER_ID
+            self.bots = []
+            self.last_update = None
+            self.update_task = None
+            self.filtered_regions = set()
+            raise
 
     def register_bot(self, bot, server_config):
         """Register a bot instance and its config for timerboard updates"""

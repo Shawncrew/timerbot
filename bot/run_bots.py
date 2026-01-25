@@ -342,7 +342,9 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
     
     try:
         logger.info(f"Starting bot for {server_name} with token: {server_config['token'][:20]}...")
+        logger.info(f"Calling bot.start() for {server_name}...")
         await bot.start(server_config['token'])
+        logger.info(f"Bot {server_name} has stopped")
     except KeyboardInterrupt:
         logger.info(f"Received keyboard interrupt for {server_name}, shutting down...")
         raise
@@ -370,7 +372,9 @@ async def main():
         
         # Create tasks for each bot
         tasks = []
+        logger.info(f"Processing {len(config['servers'])} server(s)...")
         for server_name, server_config in config['servers'].items():
+            logger.info(f"Processing server: {server_name}")
             if server_config.get('token'):  # Only run if token is configured
                 try:
                     logger.info(f"Creating bot task for {server_name}...")
@@ -381,11 +385,19 @@ async def main():
                     logger.error(f"Error creating bot task for {server_name}: {e}")
                     logger.exception("Full traceback:")
                     raise
+            else:
+                logger.info(f"Skipping {server_name} - no token configured")
         
         logger.info(f"Starting {len(tasks)} bot instance(s)...")
+        if not tasks:
+            logger.error("No bot tasks to run! Check your configuration.")
+            return
+        
         # Run all bots
         try:
+            logger.info("Calling asyncio.gather() to start bot tasks...")
             await asyncio.gather(*tasks)
+            logger.info("All bot tasks completed")
         except Exception as e:
             logger.error(f"Error running bot tasks: {e}")
             logger.exception("Full traceback:")
