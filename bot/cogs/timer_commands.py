@@ -908,9 +908,10 @@ Use `!timerhelp <command>` for detailed information about any command."""
                     # Check for "Customs Office" reinforcement
                     if "Customs Office" in content and "has been reinforced" in content:
                         logger.info(f"[SKYHOOK] Found 'Customs Office' reinforcement in message")
-                        # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U"
+                        # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U (Pure Blind)"
+                        # Pattern handles optional parentheses/region after system name
                         customs_match = re.search(
-                            r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)',
+                            r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)(?:\s*\([^)]+\))?',
                             content,
                             re.IGNORECASE
                         )
@@ -918,8 +919,8 @@ Use `!timerhelp <command>` for detailed information about any command."""
                             system = customs_match.group(3).strip()  # System is the third group (after "in")
                             planet = customs_match.group(2).strip()
                             logger.info(f"[SKYHOOK] Matched Customs Office - system: {system}, planet: {planet}")
-                            # Extract timer time from "will come out at: 2026-01-26 11:50"
-                            timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                            # Extract timer time from "will come out at: 2026-01-26 11:50" (may have text after like "(a day from now)")
+                            timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
                             if timer_match:
                                 timer_time_str = timer_match.group(1)
                                 try:
@@ -1405,9 +1406,9 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             message_count += 1
             if message_count % 50 == 0:
                 logger.info(f"[SKYHOOK-BACKFILL] Processed {message_count} messages so far...")
-            content = message.content
-            # If content is empty or doesn't contain keywords, try to extract from embed
-            if (not content or ("Skyhook lost shield" not in content and "Customs Office" not in content)) and message.embeds:
+            content = message.content or ""
+            # Always extract embed content and combine with message content for better matching
+            if message.embeds:
                 embed = message.embeds[0]
                 embed_text = []
                 if embed.title:
@@ -1416,16 +1417,22 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                     embed_text.append(embed.description)
                 for field in getattr(embed, 'fields', []):
                     embed_text.append(f"{field.name} {field.value}")
-                content = "\n".join(embed_text)
-                logger.info(f"[SKYHOOK-BACKFILL] Extracted embed content: {content}")
-            logger.info(f"[SKYHOOK-BACKFILL] Considering message: {content}")
+                # Also check footer if present
+                if hasattr(embed, 'footer') and embed.footer and embed.footer.text:
+                    embed_text.append(embed.footer.text)
+                if embed_text:
+                    embed_content = "\n".join(embed_text)
+                    content = (content + "\n" + embed_content) if content else embed_content
+                    logger.info(f"[SKYHOOK-BACKFILL] Extracted embed content and combined with message content")
+            logger.info(f"[SKYHOOK-BACKFILL] Considering message (first 300 chars): {content[:300]}")
             
             # Check for "Customs Office" reinforcement
             if "Customs Office" in content and "has been reinforced" in content:
                 logger.info(f"[SKYHOOK-BACKFILL] Found 'Customs Office' reinforcement in message")
-                # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U"
+                # Extract system and planet from "The Customs Office at TFA0-U III in TFA0-U (Pure Blind)"
+                # Pattern handles optional parentheses/region after system name
                 customs_match = re.search(
-                    r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)',
+                    r'The Customs Office at\s+([A-Z0-9-]+)\s+([IVX]+)\s+in\s+([A-Z0-9-]+)(?:\s*\([^)]+\))?',
                     content,
                     re.IGNORECASE
                 )
@@ -1433,8 +1440,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                     system = customs_match.group(3).strip()  # System is the third group (after "in")
                     planet = customs_match.group(2).strip()
                     logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office - system: {system}, planet: {planet}")
-                    # Extract timer time from "will come out at: 2026-01-26 11:50"
-                    timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', content, re.IGNORECASE)
+                    # Extract timer time from "will come out at: 2026-01-26 11:50" (may have text after like "(a day from now)")
+                    timer_match = re.search(r'will come out at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})(?:\s*\([^)]+\))?', content, re.IGNORECASE)
                     if timer_match:
                         timer_time_str = timer_match.group(1)
                         logger.info(f"[SKYHOOK-BACKFILL] Matched Customs Office timer time: {timer_time_str}")
