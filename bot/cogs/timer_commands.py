@@ -1220,8 +1220,7 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
                 new_timer, _ = await timerboard.add_timer(timer_time, description)
                 logger.info(f"[BACKFILL] Added timer: {description} at {timer_time}")
                 added += 1
-                add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
-                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
             except Exception as e:
                 logger.warning(f"[BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                 failed += 1
@@ -1235,6 +1234,8 @@ async def backfill_citadel_timers(bot, timerboard, server_config):
             summary = (
                 f"Structure backfill complete: {added} timers added, {already} already present, {failed} failed."
             )
+            if added > 0 and details:
+                summary += "\n" + "\n".join([f"Added Timer: {detail}" for detail in details])
             await cmd_channel.send(summary)
             logger.info(f"[CITADEL-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
         except Exception as e:
@@ -1338,8 +1339,7 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                     new_timer, _ = await timerboard.add_timer(timer_time, description)
                     logger.info(f"[SOV-BACKFILL] Added timer: {description} at {timer_time}")
                     added += 1
-                    add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - Infrastructure Hub {tags}"
-                    details.append(f"{system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                    details.append(f"{system} - Infrastructure Hub at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
                 except Exception as e:
                     logger.warning(f"[SOV-BACKFILL] Failed to add timer: {description} at {timer_time} | Error: {e}")
                     failed += 1
@@ -1353,6 +1353,8 @@ async def backfill_sov_timers(bot, timerboard, server_config):
         summary = (
             f"SOV Backfill complete: {added} timers added, {already} already present, {failed} failed."
         )
+        if added > 0 and details:
+            summary += "\n" + "\n".join([f"Added Timer: {detail}" for detail in details])
         await cmd_channel.send(summary)
     logger.info(f"SOV Backfill summary: {added} added, {already} already present, {failed} failed.") 
 
@@ -1507,8 +1509,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                             'tags': tags
                         })
                         logger.info(f"[SKYHOOK-BACKFILL] Collected Customs Office timer to add: {description} at {timer_time}")
-                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
-                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
                     else:
                         logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in Customs Office message")
                         logger.warning(f"[SKYHOOK-BACKFILL] Message content: {content[:500]}")
@@ -1589,8 +1590,7 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
                             'tags': tags
                         })
                         logger.info(f"[SKYHOOK-BACKFILL] Collected timer to add: {description} at {timer_time}")
-                        add_cmd = f"!add {timer_time.strftime('%Y-%m-%d %H:%M:%S')} {system} - {structure_name} {tags}"
-                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}\nAdd command: {add_cmd}")
+                        details.append(f"{system} - {structure_name} at {timer_time.strftime('%Y-%m-%d %H:%M')} {tags}")
                     else:
                         logger.warning(f"[SKYHOOK-BACKFILL] Could not find timer time in message: {content}")
                 else:
@@ -1656,6 +1656,10 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             timerboard.timers.append(new_timer)
             timerboard.next_id += 1
             added += 1
+            # Add to details if not already there (for timers added directly)
+            detail_str = f"{timer_data['system']} - {timer_data['structure_name']} at {timer_data['time'].strftime('%Y-%m-%d %H:%M')} {timer_data['tags']}"
+            if detail_str not in details:
+                details.append(detail_str)
             logger.info(f"[SKYHOOK-BACKFILL] Added timer: {timer_data['description']} at {timer_data['time']} (ID: {new_timer.timer_id})")
         except Exception as e:
             logger.warning(f"[SKYHOOK-BACKFILL] Failed to add timer: {timer_data['description']} at {timer_data['time']} | Error: {e}")
@@ -1685,6 +1689,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
             summary = (
                 f"Skyhook Backfill complete: {added} timers added, {already} already present, {failed} failed."
             )
+            if added > 0 and details:
+                summary += "\n" + "\n".join([f"Added Timer: {detail}" for detail in details])
             await cmd_channel.send(summary)
             logger.info(f"[SKYHOOK-BACKFILL] ✅ Sent summary to commands channel: #{cmd_channel.name}")
         except Exception as e:
