@@ -28,6 +28,13 @@ class Timer:
 
     def __post_init__(self):
         """Parse system and structure name from description after initialization"""
+        # Only parse if system wasn't already provided (e.g., from add_timer method)
+        if self.system:
+            # System already set, just ensure region is set if needed
+            if not self.region:
+                self.region = get_region(self.system)
+            return
+        
         # First try to parse Sov Hub format
         sov_hub_match = re.match(r'Sov Hub \((.*?)\)', self.description)
         if sov_hub_match:
@@ -43,7 +50,8 @@ class Timer:
                 self.region = get_region(self.system)
         else:
             # Try standard format
-            match = re.match(r'([A-Z0-9-]+)\s*-\s*(.*?)(?=\s*\[|$)', self.description)
+            # System names can be alphanumeric with dashes (TFA0-U) or regular names (Getrenjesa)
+            match = re.match(r'([A-Za-z0-9-]+)\s*-\s*(.*?)(?=\s*\[|$)', self.description)
             if match:
                 self.system = match.group(1)
                 self.structure_name = match.group(2).strip()
