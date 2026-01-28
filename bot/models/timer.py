@@ -114,14 +114,14 @@ class TimerBoard:
     def __init__(self):
         try:
             logger.info("TimerBoard.__init__() called")
-        self.timers = []
-        self.next_id = self.STARTING_TIMER_ID
-        self.bots = []  # List to store bot instances
-        self.last_update = None
-        self.update_task = None
-        self.filtered_regions = set()  # Set of region names to filter out
+            self.timers = []
+            self.next_id = self.STARTING_TIMER_ID
+            self.bots = []  # List to store bot instances
+            self.last_update = None
+            self.update_task = None
+            self.filtered_regions = set()  # Set of region names to filter out
             logger.info("TimerBoard basic attributes initialized, calling load_data()...")
-        self.load_data()
+            self.load_data()
             logger.info("TimerBoard.__init__() completed successfully")
         except Exception as e:
             logger.error(f"Error in TimerBoard.__init__(): {e}")
