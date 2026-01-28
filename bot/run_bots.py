@@ -387,8 +387,8 @@ async def main():
         # Create shared timerboard
         logger.info("Initializing shared timerboard...")
         try:
-        timerboard = TimerBoard()
-        logger.info("Timerboard initialized successfully")
+            timerboard = TimerBoard()
+            logger.info("Timerboard initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing timerboard: {e}")
             logger.exception("Full traceback:")
