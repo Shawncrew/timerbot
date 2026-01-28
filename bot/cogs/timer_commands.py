@@ -333,8 +333,6 @@ Examples:
                             description = f"{system} - {structure} {tags}"
                         else:
                             description = input_text
-                    else:
-                        description = input_text
                 else:
                     # Try to parse the direct time input format: YYYY-MM-DD HH:MM:SS <description>
                     direct_time_match = re.match(
