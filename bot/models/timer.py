@@ -90,7 +90,7 @@ class Timer:
                 base_str += f" {self.notes}"
         
         # Add timer ID at the end
-        base_str += f" ({self.timer_id})"
+            base_str += f" ({self.timer_id})"
         
         if is_expired:
             base_str = f"~~{base_str}~~"
@@ -114,14 +114,14 @@ class TimerBoard:
     def __init__(self):
         try:
             logger.info("TimerBoard.__init__() called")
-            self.timers = []
-            self.next_id = self.STARTING_TIMER_ID
-            self.bots = []  # List to store bot instances
-            self.last_update = None
-            self.update_task = None
-            self.filtered_regions = set()  # Set of region names to filter out
+        self.timers = []
+        self.next_id = self.STARTING_TIMER_ID
+        self.bots = []  # List to store bot instances
+        self.last_update = None
+        self.update_task = None
+        self.filtered_regions = set()  # Set of region names to filter out
             logger.info("TimerBoard basic attributes initialized, calling load_data()...")
-            self.load_data()
+        self.load_data()
             logger.info("TimerBoard.__init__() completed successfully")
         except Exception as e:
             logger.error(f"Error in TimerBoard.__init__(): {e}")
@@ -288,7 +288,8 @@ class TimerBoard:
         """Add a new timer and update all timerboards"""
         try:
             # Parse system and structure name from description
-            system_match = re.match(r'([A-Z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
+            # System names can be alphanumeric with dashes (TFA0-U) or regular names (Getrenjesa)
+            system_match = re.match(r'([A-Za-z0-9-]+)\s*-\s*(.+?)(?:\s+\[.*\])?$', description)
             if system_match:
                 system = system_match.group(1).strip()
                 structure_name = system_match.group(2).strip()

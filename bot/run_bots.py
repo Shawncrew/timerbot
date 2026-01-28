@@ -387,8 +387,8 @@ async def main():
         # Create shared timerboard
         logger.info("Initializing shared timerboard...")
         try:
-            timerboard = TimerBoard()
-            logger.info("Timerboard initialized successfully")
+        timerboard = TimerBoard()
+        logger.info("Timerboard initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing timerboard: {e}")
             logger.exception("Full traceback:")
@@ -454,7 +454,7 @@ if __name__ == "__main__":
         print(f'NC Timerbot: Exception caught in __main__: {e}')
         logger.error(f"Fatal error starting application: {e}")
         logger.exception("Full traceback:")
-        raise
+        raise 
     print('NC Timerbot: __main__ block completed')
 else:
     print(f'NC Timerbot: Module imported as {__name__}') 
