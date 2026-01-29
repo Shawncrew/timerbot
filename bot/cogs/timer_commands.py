@@ -417,6 +417,44 @@ The timer ID is shown in parentheses at the end of each timer entry in the timer
 
     @commands.command()
     @commands.check(cmd_channel_check)
+    async def backfill(self, ctx):
+        """Run all backfills (SOV, Skyhook, Structure) to check for timers from channel history.
+
+**Usage:**
+```
+!backfill
+```
+
+Runs SOV, Skyhook, and Structure backfills for this server. Results are posted to this channel."""
+        # Find server config for the current guild
+        server_config = None
+        for sc in CONFIG['servers'].values():
+            cmd_ch = self.bot.get_channel(sc.get('commands')) if sc.get('commands') else None
+            if cmd_ch and cmd_ch.guild and cmd_ch.guild.id == ctx.guild.id:
+                server_config = sc
+                break
+        if not server_config:
+            await ctx.send("Could not find server configuration for this server.")
+            return
+        try:
+            await ctx.send("Running backfills (SOV, Skyhook, Structure)... Results will be posted here.")
+            logger.info(f"{ctx.author} triggered backfill for guild {ctx.guild.id}")
+            # SOV backfill
+            if server_config.get('sov'):
+                await backfill_sov_timers(self.bot, self.timerboard, server_config)
+            # Skyhook backfill
+            if server_config.get('skyhooks'):
+                await backfill_skyhook_timers(self.bot, self.timerboard, server_config)
+            # Structure (citadel) backfill
+            if server_config.get('citadel_attacked'):
+                await backfill_citadel_timers(self.bot, self.timerboard, server_config)
+            await ctx.send("Backfills complete.")
+        except Exception as e:
+            logger.exception("Error running backfills")
+            await ctx.send(f"Error running backfills: {str(e)}")
+
+    @commands.command()
+    @commands.check(cmd_channel_check)
     async def refresh(self, ctx):
         """Refresh the timerboard display by clearing and recreating all messages.
 
@@ -557,6 +595,7 @@ or
 **Available commands:**
 - `!add` - Add a new timer (multiple formats supported)
 - `!rm` - Remove a timer by ID
+- `!backfill` - Run all backfills to check for timers from channel history
 - `!refresh` - Refresh the timerboard display
 - `!filter` - Filter timers from specific regions
 - `!unfilter` - Unfilter timers from specific regions
@@ -625,6 +664,14 @@ Examples:
 ```
 
 The timer ID is shown in parentheses at the end of each timer entry in the timerboard.""",
+                    'backfill': """**!backfill** - Run all backfills (SOV, Skyhook, Structure) to check for timers from channel history.
+
+**Usage:**
+```
+!backfill
+```
+
+Runs SOV, Skyhook, and Structure backfills for this server. Results are posted to this channel.""",
                     'refresh': """**!refresh** - Refresh the timerboard display by clearing and recreating all messages.
 
 **Usage:**
