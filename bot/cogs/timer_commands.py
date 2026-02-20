@@ -1735,16 +1735,8 @@ async def backfill_skyhook_timers(bot, timerboard, server_config):
         timerboard.sort_timers()
         timerboard.save_data()
         logger.info(f"[SKYHOOK-BACKFILL] Saved {added} new timers to timerboard")
-        
-        # Update timerboard once at the end
-        logger.info(f"[SKYHOOK-BACKFILL] Updating timerboard display...")
-        timerboard_channels = [
-            bot.get_channel(server_config['timerboard'])
-            for server_config in CONFIG['servers'].values()
-            if server_config.get('timerboard') is not None
-        ]
-        await timerboard.update_timerboard(timerboard_channels)
-        logger.info(f"[SKYHOOK-BACKFILL] ✅ Timerboard updated with {added} new timers")
+        # Timerboard display is updated once per server by run_bots "Initial timerboard update" after backfills
+        logger.info(f"[SKYHOOK-BACKFILL] ✅ Backfill complete; timerboard will be updated once per server on boot")
     
     # Send summary
     logger.info(f"[SKYHOOK-BACKFILL] Processing complete. Results: {added} added, {already} already present, {failed} failed")

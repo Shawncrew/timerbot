@@ -6,14 +6,33 @@ from pathlib import Path
 import re
 import pytz
 import shutil
+import asyncio
+
 from bot.utils.logger import logger
 from bot.utils.helpers import clean_system_name
 from bot.utils.config import CONFIG
 from bot.utils.eve_data import get_region
-import asyncio
+
+try:
+    from discord.errors import HTTPException as DiscordHTTPException
+except ImportError:
+    DiscordHTTPException = None
 
 EVE_TZ = pytz.timezone('UTC')
-SAVE_FILE = "/opt/timerbot/data/timerboard_data.json"
+# Production path; on Windows or when missing, use project-root local file
+SAVE_FILE_DEFAULT = "/opt/timerbot/data/timerboard_data.json"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _get_save_path():
+    """Use production path if it exists; otherwise project root (for local/Windows runs)."""
+    prod = Path(SAVE_FILE_DEFAULT)
+    if prod.exists() or prod.parent.exists():
+        return str(prod)
+    return str(_PROJECT_ROOT / "timerboard_data.json")
+
+
+SAVE_FILE = _get_save_path()
 
 @dataclass
 class Timer:
@@ -113,6 +132,19 @@ class Timer:
                 self.system.lower() == other.system.lower() and
                 self.structure_name.lower() == other.structure_name.lower())
 
+    def to_api_dict(self) -> dict:
+        """Export for API/JSON: time (ISO), description, timer_id, system, structure_name, notes, region."""
+        return {
+            "time": self.time.isoformat(),
+            "description": self.description,
+            "timer_id": self.timer_id,
+            "system": self.system,
+            "structure_name": self.structure_name,
+            "notes": self.notes,
+            "region": self.region,
+        }
+
+
 class TimerBoard:
     SAVE_FILE = SAVE_FILE
     STARTING_TIMER_ID = 1000
@@ -127,6 +159,7 @@ class TimerBoard:
             self.bots = []  # List to store bot instances
             self.last_update = None
             self.update_task = None
+            self._pending_update_task = None  # For debounced update_all_timerboards
             self.filtered_regions = set()  # Set of region names to filter out
             logger.info("TimerBoard basic attributes initialized, calling load_data()...")
             self.load_data()
@@ -140,6 +173,7 @@ class TimerBoard:
             self.bots = []
             self.last_update = None
             self.update_task = None
+            self._pending_update_task = None
             self.filtered_regions = set()
             raise
 
@@ -153,14 +187,16 @@ class TimerBoard:
             self.start_update_task()
 
     def start_update_task(self):
-        """Start the periodic update task"""
+        """Start the periodic update task. First run is after UPDATE_INTERVAL so boot uses a single explicit update."""
         if not self.update_task:
             logger.info("Starting periodic timerboard update task")
             
             async def update_loop():
+                # Don't run immediately on boot; let the single post-backfill update run first
+                await asyncio.sleep(self.UPDATE_INTERVAL)
                 while True:
                     try:
-                        await self.update_all_timerboards()
+                        await self._update_all_timerboards_impl()
                         await asyncio.sleep(self.UPDATE_INTERVAL)
                     except Exception as e:
                         logger.error(f"Error in timerboard update loop: {e}")
@@ -170,10 +206,30 @@ class TimerBoard:
             self.update_task = asyncio.create_task(update_loop())
             logger.info("Timerboard update task started")
 
-    async def update_all_timerboards(self):
-        """Update timerboards in all registered servers"""
+    _UPDATE_DEBOUNCE_SECONDS = 3
+
+    async def update_all_timerboards(self, immediate: bool = False):
+        """Update timerboards in all registered servers.
+        When immediate=False (e.g. from add_timer), updates are debounced so many rapid
+        calls result in one update. When immediate=True (periodic loop, post-backfill),
+        update runs once immediately."""
+        if immediate:
+            await self._update_all_timerboards_impl()
+            return
+        # Debounce: cancel any scheduled update and schedule one after a short delay
+        if self._pending_update_task and not self._pending_update_task.done():
+            self._pending_update_task.cancel()
+        async def run_later():
+            await asyncio.sleep(self._UPDATE_DEBOUNCE_SECONDS)
+            await self._update_all_timerboards_impl()
+        self._pending_update_task = asyncio.create_task(run_later())
+
+    async def _update_all_timerboards_impl(self):
+        """Internal: perform one full update of all timerboard channels."""
         logger.info(f"Updating timerboards in {len(self.bots)} servers")
-        for bot, server_config in self.bots:
+        for i, (bot, server_config) in enumerate(self.bots):
+            if i > 0:
+                await asyncio.sleep(2)  # Space out API calls to avoid 429 rate limits
             channel = bot.get_channel(server_config['timerboard'])
             if channel:
                 logger.info(f"Updating timerboard in {channel.guild.name}")
@@ -201,11 +257,13 @@ class TimerBoard:
             'filtered_regions': list(self.filtered_regions)  # Save filtered regions
         }
         
+        save_path = Path(self.SAVE_FILE)
         try:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
             # Create backup before saving (for safety/recovery purposes, but not used for auto-restore)
             # The backfill function serves as the restoration mechanism by reading from Discord history
-            if Path(self.SAVE_FILE).exists():
-                backup_file = Path(self.SAVE_FILE).with_suffix('.json.bak')
+            if save_path.exists():
+                backup_file = save_path.with_suffix('.json.bak')
                 shutil.copy2(self.SAVE_FILE, backup_file)
             
             with open(self.SAVE_FILE, 'w') as f:
@@ -217,24 +275,17 @@ class TimerBoard:
     def load_data(self):
         """Load timerboard data from JSON file"""
         try:
-            # First try the /opt/timerbot/data/ location
+            # SAVE_FILE is already resolved (production or project-root local)
             if Path(self.SAVE_FILE).exists():
                 logger.info(f"Loading timerboard data from {self.SAVE_FILE}")
                 with open(self.SAVE_FILE, 'r') as f:
                     data = json.load(f)
             else:
-                # Try local directory
-                local_file = "timerboard_data.json"
-                if Path(local_file).exists():
-                    logger.info(f"Loading timerboard data from {local_file}")
-                    with open(local_file, 'r') as f:
-                        data = json.load(f)
-                else:
-                    logger.info("No save file found in either location")
-                    logger.info("Starting with empty timerboard")
-                    self.next_id = self.STARTING_TIMER_ID
-                    self.timers = []
-                    return
+                logger.info("No save file found")
+                logger.info("Starting with empty timerboard")
+                self.next_id = self.STARTING_TIMER_ID
+                self.timers = []
+                return
 
             # Process the loaded data
             self.next_id = max(data.get('next_id', self.STARTING_TIMER_ID), self.STARTING_TIMER_ID)

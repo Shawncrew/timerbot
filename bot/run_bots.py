@@ -23,6 +23,10 @@ print('NC Timerbot: Starting bot package imports...')
 from bot.utils.config import load_config, CONFIG
 print('NC Timerbot: config imported')
 
+import aiohttp
+from aiohttp import web
+print('NC Timerbot: aiohttp imported')
+
 from bot.utils.logger import logger
 print('NC Timerbot: logger imported')
 
@@ -373,9 +377,51 @@ async def run_bot_instance(server_name, server_config, shared_timerboard):
         logger.info(f"Received keyboard interrupt for {server_name}, shutting down...")
         raise
     except Exception as e:
+        # Unwrap discord.py's AttributeError (ws.sequence when ws is None after connection failure)
+        cause = getattr(e, "__cause__", None)
+        if isinstance(e, AttributeError) and "sequence" in str(e) and cause is not None:
+            logger.error(f"Discord connection failed for {server_name}: {cause}")
+            if "getaddrinfo failed" in str(cause) or "Cannot connect to host" in str(cause):
+                logger.error("Check network/DNS (e.g. can you reach gateway.discord.gg?). VPN or firewall may block Discord.")
+            logger.exception("Full traceback:")
+            raise cause from None
         logger.error(f"Error running bot for {server_name}: {e}")
         logger.exception("Full traceback:")
         raise
+
+async def run_timers_api(timerboard):
+    """Run HTTP API server that serves GET /timers and GET /api/timers with JSON list of timers."""
+    if not CONFIG.get("timerboard_api_enabled"):
+        return
+    host = CONFIG.get("timerboard_api_host") or "127.0.0.1"
+    port = int(CONFIG.get("timerboard_api_port") or 8765)
+    api_key = (CONFIG.get("timerboard_api_key") or "").strip() or None
+
+    def auth_ok(request):
+        if not api_key:
+            return True
+        key = request.headers.get("X-API-Key") or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+        return key == api_key
+
+    async def handle_timers(request):
+        if not auth_ok(request):
+            return web.json_response({"error": "Unauthorized"}, status=401)
+        data = [t.to_api_dict() for t in timerboard.timers]
+        return web.json_response({"timers": data})
+
+    app = web.Application()
+    app.router.add_get("/timers", handle_timers)
+    app.router.add_get("/api/timers", handle_timers)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host, port)
+    await site.start()
+    logger.info(f"Timerboard API listening on http://{host}:{port} (GET /timers, GET /api/timers)")
+
+    # Run forever (server is now serving)
+    while True:
+        await asyncio.sleep(3600)
+
 
 async def main():
     """Run all bot instances"""
@@ -411,6 +457,10 @@ async def main():
                     raise
             else:
                 logger.info(f"Skipping {server_name} - no token configured")
+
+        if CONFIG.get("timerboard_api_enabled"):
+            tasks.append(run_timers_api(timerboard))
+            logger.info("Timerboard API task added")
         
         logger.info(f"Starting {len(tasks)} bot instance(s)...")
         if not tasks:

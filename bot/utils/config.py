@@ -1,9 +1,19 @@
 import os
+import re
 import yaml
 from dotenv import load_dotenv
 from .logger import logger
 
 CONFIG_FILE = "/opt/timerbot/config.yaml"
+
+
+def _subst_env_val(val):
+    """If val is a string like ${VAR}, return os.getenv(VAR) or val."""
+    if isinstance(val, str) and re.match(r"^\s*\$\{[^}]+\}\s*$", val):
+        var = val.strip().strip("${}").strip()
+        return os.getenv(var) or val
+    return val
+
 
 def load_config():
     """Load configuration from config.yaml"""
@@ -11,6 +21,11 @@ def load_config():
         'check_interval': 60,
         'notification_time': 60,
         'expiry_time': 240,  # 4 hours (240 minutes) - keep timers for 4 hours past expiration
+        # Expose timers via HTTP API (GET /timers returns JSON)
+        'timerboard_api_enabled': False,
+        'timerboard_api_host': '127.0.0.1',
+        'timerboard_api_port': 8765,
+        'timerboard_api_key': None,  # optional; use "${ENV_VAR}" for env substitution
         'servers': {
             'server1': {
                 'timerboard': None,
@@ -97,7 +112,8 @@ def load_config():
             
             # Log final config for debugging
             logger.info(f"Final loaded config servers: {loaded_config.get('servers', {})}")
-            
+            if loaded_config.get("timerboard_api_key") is not None:
+                loaded_config["timerboard_api_key"] = _subst_env_val(loaded_config["timerboard_api_key"])
             return loaded_config
                 
         # If not found, try local directory
@@ -106,6 +122,14 @@ def load_config():
             with open(local_config, 'r') as f:
                 config = yaml.safe_load(f)
                 logger.info(f"Loaded configuration from {local_config}")
+                
+                # Replace environment variables in tokens (same as CONFIG_FILE branch)
+                for server in config.get('servers', {}).values():
+                    if 'token' in server and isinstance(server['token'], str):
+                        token_var = server['token'].strip('${} ')
+                        server['token'] = os.getenv(token_var)
+                        if not server['token']:
+                            logger.error(f"Token {token_var} not found in environment variables")
                 
                 # Same channel validation as above
                 if 'servers' not in config:
@@ -120,7 +144,8 @@ def load_config():
                         if channel not in config['servers'][server]:
                             config['servers'][server][channel] = None
                             logger.warning(f"Channel '{channel}' not found in {server} config, setting to None")
-                
+                if config.get("timerboard_api_key") is not None:
+                    config["timerboard_api_key"] = _subst_env_val(config["timerboard_api_key"])
                 return config
                 
         # If neither exists, use defaults
