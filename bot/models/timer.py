@@ -380,14 +380,27 @@ class TimerBoard:
                 region=region
             )
             
-            # Check for duplicates
+            # Check for duplicates (same system, structure, time, and notes)
             similar_timers = [t for t in self.timers if t.is_similar(new_timer)]
             if similar_timers:
                 logger.warning(f"Found {len(similar_timers)} similar timers:")
                 for t in similar_timers:
                     logger.warning(f"  - ID {t.timer_id}: {t.system} - {t.structure_name} at {t.time.strftime('%Y-%m-%d %H:%M:%S')}")
+                # If an exact duplicate already exists, don't add another.
+                for t in similar_timers:
+                    if (
+                        t.system.lower() == new_timer.system.lower()
+                        and t.structure_name.lower() == new_timer.structure_name.lower()
+                        and t.notes == new_timer.notes
+                        and abs((t.time - new_timer.time).total_seconds()) < 60
+                    ):
+                        logger.info(
+                            f"Exact duplicate timer detected; skipping add. "
+                            f"Existing ID {t.timer_id}: {t.system} - {t.structure_name} at {t.time.strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
+                        return t, similar_timers
             
-            # Always add the timer
+            # Add the timer
             self.timers.append(new_timer)
             self.next_id += 1
             self.sort_timers()

@@ -516,6 +516,47 @@ Use this if the timerboard display becomes out of sync or corrupted."""
             logger.exception("Full traceback:")
             await ctx.send(f"Error refreshing timerboards: {e}")
 
+    @commands.command(name="dedupsov")
+    @commands.check(cmd_channel_check)
+    async def dedup_sov_timers(self, ctx):
+        """One-time cleanup: remove duplicate SOV (IHUB) timers for the same system/time."""
+        try:
+            logger.info(f"{ctx.author} requested SOV timer de-duplication")
+            timers = list(self.timerboard.timers)  # copy to avoid modifying during iteration
+            seen_keys = {}
+            removed = 0
+            kept = 0
+            for t in sorted(timers, key=lambda x: (x.system.upper(), x.time, x.timer_id)):
+                # Identify IHUB timers
+                is_ihub = (
+                    t.structure_name.lower() == "infrastructure hub"
+                    or "[IHUB]" in (t.notes or "")
+                    or "[IHUB]" in (t.description or "")
+                )
+                if not is_ihub:
+                    continue
+                # Key by system + exact timestamp (to avoid collapsing distinct timers)
+                key = (t.system.upper(), t.time.replace(second=0, microsecond=0))
+                if key in seen_keys:
+                    # Duplicate: remove it
+                    logger.info(f"[DEDUP-SOV] Removing duplicate IHUB timer ID {t.timer_id} for {t.system} at {t.time}")
+                    self.timerboard.remove_timer(t.timer_id)
+                    removed += 1
+                else:
+                    seen_keys[key] = t
+                    kept += 1
+            # Persist and redraw timerboards if we removed anything
+            if removed > 0:
+                try:
+                    await self.timerboard.update_all_timerboards()
+                except Exception as e:
+                    logger.warning(f"[DEDUP-SOV] Failed to update all timerboards after dedup: {e}")
+            await ctx.send(f"✅ SOV de-dup complete. Kept {kept} IHUB timers, removed {removed} duplicates.")
+        except Exception as e:
+            logger.error(f"Error de-duplicating SOV timers: {e}")
+            logger.exception("Full traceback:")
+            await ctx.send(f"Error de-duplicating SOV timers: {e}")
+
     @commands.command()
     @commands.check(cmd_channel_check)
     async def filter(self, ctx):
