@@ -56,7 +56,9 @@ def parse_timer_message(content):
     # System: look for bold text after "in" or markdown link
     system_match = re.search(r'in \*\*([^*\n]+)\*\*', content)
     if not system_match:
-        system_match = re.search(r'in \[([A-Z0-9-]+)\]', content)
+        # Dotlan-style markdown link: in [SystemName](...)
+        # Allow mixed-case letters and digits, not just all-caps.
+        system_match = re.search(r'in \[([A-Za-z0-9-]+)\]', content)
     system = system_match.group(1).strip() if system_match else None
     # Timer type and time
     timer_type = None
@@ -1381,21 +1383,21 @@ async def backfill_sov_timers(bot, timerboard, server_config):
                 alert_emoji = " 🚨" if region and region in ALERT_REGIONS else ""
                 tags = f"[NC][IHUB] 🛡️{alert_emoji}"
                 description = f"{system} - Infrastructure Hub {tags}"
-                # Check for duplicate
+                # Check for duplicate: avoid multiple IHUB timers for the same system on the same day.
                 duplicate = False
                 matching_timer = None
                 for t in timerboard.timers:
                     if (
                         t.system.upper() == system.upper()
                         and t.structure_name.upper() == "INFRASTRUCTURE HUB"
-                        and abs((t.time - timer_time).total_seconds()) < 60
+                        and t.time.date() == timer_time.date()
                     ):
                         duplicate = True
                         matching_timer = t
                         break
                 if duplicate:
-                    timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id})" if matching_timer else ""
-                    logger.info(f"[SOV-BACKFILL] Skipping duplicate: {description} at {timer_time}{timer_id_str}")
+                    timer_id_str = f" (matches existing timer ID: {matching_timer.timer_id} at {matching_timer.time})" if matching_timer else ""
+                    logger.info(f"[SOV-BACKFILL] Skipping duplicate IHUB timer for {system} on {timer_time.date()}: {description}{timer_id_str}")
                     already += 1
                     continue
                 # Add timer
